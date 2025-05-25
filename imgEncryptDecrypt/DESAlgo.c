@@ -1,12 +1,11 @@
 #include <stdio.h>
 
-int A = 0x4;
-
+long M = 0x0123456789ABCDEF;
+long K = 0x133457799BBCDFF1;
 
 int main(){
-	printf("Hello World!\n");
-	printf("A: %u\n", A);
-	printf("A << 1: %u\n", A << 1);
+	printf("M = %ld\n", M);
+	printf("K = %ld\n", K);
 
 	return 0;
 }
