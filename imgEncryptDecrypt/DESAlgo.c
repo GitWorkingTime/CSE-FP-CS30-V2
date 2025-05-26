@@ -14,8 +14,7 @@ int PC1[] = { 57,   49,    41,   33,    25,    17,    9,
 int leftShifts[] = {1,   1,   2,   2,
 					2,   2,   2,   2,
 					1,   2,   2,   2,
-					2,   2,   2,   2,
-					1};
+					2,   2,   2,   1};
 
 void hexToBin(long hex){
 	/*
@@ -122,17 +121,29 @@ int main(){
 	C[0] = C0;
 	D[0] = D0;
 
+	/*
+	
+	shift the original hexadecimal by the required number of bits. Use 
+	"& 0xFFFFFFF" to confine the shifted hexadecimal to 28 bits long, and
+	store this as one seperate variable. Have another variable to shift to
+	the right this time by (total number of bits - number of bits to shift).
+	Use the XOR opperation to combine the two and now we have ROTATED the 
+	bits in the original hexadecimal around by some certain amount.
+
+	*/
+
 	for(int i = 1; i < 17; i++){
-		unsigned long cA = (C[i-1] << leftShifts[i - 1]) & 0xFFFFFFF;
-		unsigned long cB = C[i - 1] >> (28 - i);
+		unsigned long cA = (C[i - 1] << leftShifts[i - 1]) & 0xFFFFFFF;
+		unsigned long cB = C[i - 1] >> (28 - leftShifts[i - 1]);
 		C[i] = cA^cB;
-		printf("C[%d]: 0x%07lX \n", i, C[i]);
+		printf("C[%d]: 0x%lX \n", i, C[i]);
 
 		unsigned long dA = (D[i - 1] << leftShifts[i - 1]) & 0xFFFFFFF;
-		unsigned long dB = D[i - 1] >> (28 - i);
+		unsigned long dB = D[i - 1] >> (28 - leftShifts[i - 1]);
 		D[i] = dA^dB;
-		printf("D[%d]: 0x%07lX \n", i, C[i]);
+		printf("D[%d]: 0x%lX \n", i, D[i]);
 		printf("\n");
 	}
+
 	return 0;
 }
