@@ -50,11 +50,16 @@ void addingStrings(){
 }
 
 void extractingBit(){
-	long num = 0x133457799BBCDFF1; //00010011 00110100 01010111 01111001 10011011 10111100 11011111 11110001
-	unsigned int bitPos = 57;
-	unsigned long mask = (1 << bitPos) - 1;
-	unsigned long extractedBit = (num >> bitPos) & mask;
-	printf("extractedBit: %lu \n", extractedBit);
+	unsigned long num = 0xa9b; // 1010 1001 1011
+	unsigned int b = (12 - 2);
+	unsigned int z = (num >> b) & 1;
+	printf("z: %d \n", z);
+
+	long k = 0x133457799BBCDFF1; // 00010011 00110100 01010111 01111001 10011011 10111100 11011111 11110001
+	unsigned int bitPos = (64 - 49);
+	unsigned long extractedBit = (k >> bitPos) & 1;
+	printf("extractedBit: %ld \n", extractedBit);
+
 }
 
 int main(){
@@ -83,20 +88,24 @@ int main(){
 	int size = *(&PC1 + 1) - PC1;
 	// printf("size of arr: %d\n", size);
 
-	extractingBit();
+	// extractingBit();
 
 	// char kChar[100] = "0001001100110100010101110111100110011011101111001101111111110001";
 	// printf("57th bit: %c\n", kChar[56]);
 
 
 	//Extracting bits:
-	// char kP[100];
-	// for (int i = 0; i < size; i++){
-	// 	unsigned int bitPos = PC1[i];
-	// 	unsigned int mask = 1 << bitPos;
-	// 	unsigned int extractedBit = (k & mask) >> bitPos;
-	// 	printf("extracted bit: %u\n", extractedBit);
-	// }
+	char kP[100];
+	for (int i = 0; i < size; i++){
+		unsigned int bitPos = 64 - PC1[i];
+		unsigned int extractedBit = (k >> bitPos) & 1;
+		// printf("extracted bit: %u\n", extractedBit);
+		char temp[100];
+		sprintf(temp, "%u", extractedBit);
+
+		strcat(kP, temp);
+	}
+	printf("Permutated key: %s\n", kP);
 
 
 
