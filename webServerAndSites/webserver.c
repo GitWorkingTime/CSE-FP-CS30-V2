@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <netinet/in.h>
+
 #define PORT 8080
 #define BUFFER_SIZE 1024
 
@@ -12,6 +13,25 @@
 This local web server can be accessed via:
 	http://localhost:8080
 */
+
+int createSocket(){
+	int mysock = socket(AF_INET, SOCK_STREAM, 0);
+	if (mysock == -1){
+		perror("webserver (socket)");
+		return 1;
+	}
+	printf("socket created successfully\n");
+	printf("\n");
+	return mysock;
+}
+
+void printAddressProperties(struct sockaddr_in host_addr){
+	printf("host_addr.sin_family: \t %d\n", host_addr.sin_family);
+	printf("host_addr.sin_port: \t %d\n", host_addr.sin_port);
+	printf("host_addr.sin_addr.s_addr: \t %d\n", host_addr.sin_addr.s_addr);
+	printf("host IP address and Port \t [%s:%u]\n", inet_ntoa(host_addr.sin_addr), ntohs(host_addr.sin_port));
+	printf("\n");
+}
 
 int main() {
 	char buffer[BUFFER_SIZE];
@@ -21,13 +41,7 @@ int main() {
 				  "<html> WEBSERVER IS UP AND RUNNING WOO </html>\r\n";
 
 	//Create socket
-	int mysock = socket(AF_INET, SOCK_STREAM, 0);
-	if (mysock == -1){
-		perror("webserver (socket)");
-		return 1;
-	}
-	printf("socket created successfully woooo\n");
-	printf("\n");
+	int mysock = createSocket();
 
 	//Create the address for the socket to bind onto
 	struct sockaddr_in host_addr;
@@ -38,13 +52,7 @@ int main() {
 	host_addr.sin_port = htons(PORT);
 	host_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	//Curious as to what the data assigned is
-	printf("host_addr.sin_family: \t %d\n", host_addr.sin_family);
-	printf("host_addr.sin_port: \t %d\n", host_addr.sin_port);
-	printf("host_addr.sin_addr.s_addr: \t %d\n", host_addr.sin_addr.s_addr);
-	printf("host IP address and Port \t [%s:%u]\n", inet_ntoa(host_addr.sin_addr), ntohs(host_addr.sin_port));
-	printf("\n");
-
+	// printAddressProperties(host_addr);
 
 	//Create the client address
 	struct sockaddr_in client_addr;
