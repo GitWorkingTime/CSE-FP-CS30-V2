@@ -11,6 +11,11 @@ int PC1[] = { 57,   49,    41,   33,    25,    17,    9,
               14,    6,    61,   53,    45,    37,   29,
               21,   13,     5,   28,    20,    12,    4};
 
+int leftShifts[] = {1,   1,   2,   2,
+					2,   2,   2,   2,
+					1,   2,   2,   2,
+					2,   2,   2,   2,
+					1};
 
 void hexToBin(long hex){
 	/*
@@ -84,15 +89,8 @@ int main(){
 	printf("value of k: %ld\n", k);
 	printf("\n");
 
-	//Printing IP-1:
+	//Determining size of PC-1:
 	int size = *(&PC1 + 1) - PC1;
-	// printf("size of arr: %d\n", size);
-
-	// extractingBit();
-
-	// char kChar[100] = "0001001100110100010101110111100110011011101111001101111111110001";
-	// printf("57th bit: %c\n", kChar[56]);
-
 
 	//Extracting bits:
 	char kP[100];
@@ -105,9 +103,36 @@ int main(){
 
 		strcat(kP, temp);
 	}
-	printf("Permutated key: %s\n", kP);
+	printf("Permutated key: %s\n", kP); // 1111000 0110011 0010101 0101111 0101010 1011001 1001111 0001111
 
+	unsigned long kPHex = strtol(kP, NULL, 2);
 
+	printf("kPHex: 0x%014lx \n", kPHex);
+	unsigned int C0 = kPHex >> 28; // 1111000 0110011 0010101 0101111
+	unsigned int D0 = kPHex & 0x0000000FFFFFFF; // 0101010 1011001 1001111 0001111
 
+	printf("\n");
+	printf("C0: 0x%x \n", C0);
+	printf("D0: 0x%x \n", D0);
+	printf("\n");
+
+	unsigned long C[17];
+	unsigned long D[17];
+
+	C[0] = C0;
+	D[0] = D0;
+
+	for(int i = 1; i < 17; i++){
+		unsigned long cA = (C[i-1] << leftShifts[i - 1]) & 0xFFFFFFF;
+		unsigned long cB = C[i - 1] >> (28 - i);
+		C[i] = cA^cB;
+		printf("C[%d]: 0x%07lX \n", i, C[i]);
+
+		unsigned long dA = (D[i - 1] << leftShifts[i - 1]) & 0xFFFFFFF;
+		unsigned long dB = D[i - 1] >> (28 - i);
+		D[i] = dA^dB;
+		printf("D[%d]: 0x%07lX \n", i, C[i]);
+		printf("\n");
+	}
 	return 0;
 }
