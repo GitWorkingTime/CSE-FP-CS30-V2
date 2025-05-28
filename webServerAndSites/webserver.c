@@ -94,7 +94,7 @@ int initServer(char *response){
 			//Go to the next socket queued
 			continue; 
 		}
-		printf("connnection accepted\n");
+		printf("connnection accepted: %d\n", newmysock);
 
 		//Get client address
 		int clientsock = getsockname(newmysock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addrlen);
