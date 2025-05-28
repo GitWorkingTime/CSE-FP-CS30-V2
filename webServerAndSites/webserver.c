@@ -63,7 +63,7 @@ int initServer(char *response){
 	//Binding the socket to the address
 	// The if function serves to check for an error (i.e if the bind function returns a -1)
 	if (bind(mysock, (struct sockaddr *)&host_addr, host_addrlen) != 0){
-		perror("webserver (bind");
+		perror("webserver (bind)");
 		return 1;
 	}
 	printf("socket successfully bound to address\n");
