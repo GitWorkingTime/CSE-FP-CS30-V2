@@ -1,44 +1,15 @@
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include "webserver.c"
-
-// //source: https://stackoverflow.com/questions/6280055/how-do-i-check-if-a-variable-is-of-a-certain-type-compare-two-types-in-c
-// #define typename(x) _Generic((x),                                                 \
-//             _Bool: "_Bool",                  unsigned char: "unsigned char",          \
-//              char: "char",                     signed char: "signed char",            \
-//         short int: "short int",         unsigned short int: "unsigned short int",     \
-//               int: "int",                     unsigned int: "unsigned int",           \
-//          long int: "long int",           unsigned long int: "unsigned long int",      \
-//     long long int: "long long int", unsigned long long int: "unsigned long long int", \
-//             float: "float",                         double: "double",                 \
-//       long double: "long double",                   char *: "pointer to char",        \
-//            void *: "pointer to void",                int *: "pointer to int",         \
-//           default: "other")
-
-// // https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/ source for appending strings
-
-
-// int main(){
-//     // char *fileContent;
-//     // unsigned long size = getFileSize("index.html");
-//     // fileContent = extractFileContentTxt("index.html");
-//     extractFileContentTxt("index.html");
-
-//     // char resp[999999] = "HTTP/1.0 200 OK\r\n"
-//     //                   "Server: webserver-c\r\n"
-//     //                   "Content-type: text/html\r\n\r\n";
-
-//     // printf("%s \n", fileContent);
-
-//     // strcat(resp, fileContent);
-//     // strcat(resp, "\r\n");
-//     // // printf("%s \n", resp);
-//     // free(fileContent);
-//     // // initServer(resp);
-
-//     return 0;
-// }
+//source: https://stackoverflow.com/questions/6280055/how-do-i-check-if-a-variable-is-of-a-certain-type-compare-two-types-in-c
+#define typename(x) _Generic((x),                                                 \
+            _Bool: "_Bool",                  unsigned char: "unsigned char",          \
+             char: "char",                     signed char: "signed char",            \
+        short int: "short int",         unsigned short int: "unsigned short int",     \
+              int: "int",                     unsigned int: "unsigned int",           \
+         long int: "long int",           unsigned long int: "unsigned long int",      \
+    long long int: "long long int", unsigned long long int: "unsigned long long int", \
+            float: "float",                         double: "double",                 \
+      long double: "long double",                   char *: "pointer to char",        \
+           void *: "pointer to void",                int *: "pointer to int",         \
+          default: "other")
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -110,10 +81,6 @@ int main() {
         strcat(resp, "\r\n");
 
         printf("resp: %s\n", resp);
-
-
-
-
 
         free(fileContent);  // Don't forget to free the allocated memory!
         initServer(resp);
