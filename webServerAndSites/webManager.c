@@ -60,12 +60,11 @@ unsigned long getFileSize(char *filePath){
     //Close it after calculating size.
     fclose(file);
     return size;
-
 }
 
 int main(){
     // initServer();
-    printf("file content:\n %s\n", extractFileContentTxt("index.html"));
+    printf("file content:\n %s \n", extractFileContentTxt("index.html"));
 
     return 0;
 }
