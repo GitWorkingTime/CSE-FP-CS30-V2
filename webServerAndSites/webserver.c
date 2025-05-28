@@ -33,12 +33,14 @@ void printAddressProperties(struct sockaddr_in host_addr){
 	printf("\n");
 }
 
-int initServer(){
+int initServer(char *response){
 	char buffer[BUFFER_SIZE];
-	char resp[] = "HTTP/1.0 200 OK\r\n"
-				  "Server: webserver-c\r\n"
-				  "Content-type: text/html\r\n\r\n"
-				  "<html> WEBSERVER IS UP AND RUNNING WOO </html>\r\n";
+	// char resp[] = "HTTP/1.0 200 OK\r\n"
+	// 			  "Server: webserver-c\r\n"
+	// 			  "Content-type: text/html\r\n\r\n"
+	// 			  "<html> WEBSERVER IS UP AND RUNNING WOO </html>\r\n";
+	char *resp = response;
+	printf("%s", resp);
 
 	//Create socket
 	int mysock = createSocket();

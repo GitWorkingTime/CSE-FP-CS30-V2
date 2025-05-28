@@ -3,8 +3,22 @@
 #include <string.h>
 #include "webserver.c"
 
+//source: https://stackoverflow.com/questions/6280055/how-do-i-check-if-a-variable-is-of-a-certain-type-compare-two-types-in-c
+#define typename(x) _Generic((x),                                                 \
+            _Bool: "_Bool",                  unsigned char: "unsigned char",          \
+             char: "char",                     signed char: "signed char",            \
+        short int: "short int",         unsigned short int: "unsigned short int",     \
+              int: "int",                     unsigned int: "unsigned int",           \
+         long int: "long int",           unsigned long int: "unsigned long int",      \
+    long long int: "long long int", unsigned long long int: "unsigned long long int", \
+            float: "float",                         double: "double",                 \
+      long double: "long double",                   char *: "pointer to char",        \
+           void *: "pointer to void",                int *: "pointer to int",         \
+          default: "other")
 
 // https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/ source for appending strings
+
+#define BUFFER_SIZE 1024
 
 unsigned long getFileSize(char *fileP);
 
@@ -21,11 +35,12 @@ char *extractFileContentTxt(char *filePath){
         return "NULL";
     }
 
-    char txtFile[size];
-    char line[size];
+    char txtFile[size + 1];
+    char line[size + 1];
     while(fgets(line, size, file)){
         strcat(txtFile, line);
     }
+    strcat(txtFile, "\0");
     // printf("%s\n", txtFile);
 
     fclose(file);
@@ -41,35 +56,45 @@ char *extractFileContentTxt(char *filePath){
 
 unsigned long getFileSize(char *filePath){
     FILE *file;
-    file = fopen(filePath, "r");
+    file = fopen(filePath, "rb");
     if(file == NULL){
         printf("cannot get file\n");
         return 0;
     }
 
     //Calculating size:
-    long size = 0;
-    char c;
-    do{
-
-        c = fgetc(file);
-        size++;
-
-    }while(c != EOF);
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
     //Close it after calculating size.
     fclose(file);
-    return size;
-
+    return fileSize + 1;
 }
 
-int main(){
-    // initServer();
-    char *str;
-    str = extractFileContentTxt("index.html");
-    printf("file content:\n %s \n", str);
+int test(char *string){
+    // printf("%s \n", string);
+    char *i = string;
+    printf("testing\n%s\n", i);
+    return 0;
+}   
 
-    free(str);
+int main(){
+    char *fileContent;
+    unsigned long size = getFileSize("index.html");
+    fileContent = extractFileContentTxt("index.html");
+
+    char resp[999999] = "HTTP/1.0 200 OK\r\n"
+                      "Server: webserver-c\r\n"
+                      "Content-type: text/html\r\n\r\n";
+
+    printf("%s \n", fileContent);
+
+    strcat(resp, fileContent);
+    strcat(resp, "\r\n");
+    // printf("%s \n", resp);
+    free(fileContent);
+    // initServer(resp);
 
     return 0;
 }
