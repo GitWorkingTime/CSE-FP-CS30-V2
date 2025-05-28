@@ -1,100 +1,126 @@
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include "webserver.c"
+
+// //source: https://stackoverflow.com/questions/6280055/how-do-i-check-if-a-variable-is-of-a-certain-type-compare-two-types-in-c
+// #define typename(x) _Generic((x),                                                 \
+//             _Bool: "_Bool",                  unsigned char: "unsigned char",          \
+//              char: "char",                     signed char: "signed char",            \
+//         short int: "short int",         unsigned short int: "unsigned short int",     \
+//               int: "int",                     unsigned int: "unsigned int",           \
+//          long int: "long int",           unsigned long int: "unsigned long int",      \
+//     long long int: "long long int", unsigned long long int: "unsigned long long int", \
+//             float: "float",                         double: "double",                 \
+//       long double: "long double",                   char *: "pointer to char",        \
+//            void *: "pointer to void",                int *: "pointer to int",         \
+//           default: "other")
+
+// // https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/ source for appending strings
+
+
+// int main(){
+//     // char *fileContent;
+//     // unsigned long size = getFileSize("index.html");
+//     // fileContent = extractFileContentTxt("index.html");
+//     extractFileContentTxt("index.html");
+
+//     // char resp[999999] = "HTTP/1.0 200 OK\r\n"
+//     //                   "Server: webserver-c\r\n"
+//     //                   "Content-type: text/html\r\n\r\n";
+
+//     // printf("%s \n", fileContent);
+
+//     // strcat(resp, fileContent);
+//     // strcat(resp, "\r\n");
+//     // // printf("%s \n", resp);
+//     // free(fileContent);
+//     // // initServer(resp);
+
+//     return 0;
+// }
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "webserver.c"
 
-//source: https://stackoverflow.com/questions/6280055/how-do-i-check-if-a-variable-is-of-a-certain-type-compare-two-types-in-c
-#define typename(x) _Generic((x),                                                 \
-            _Bool: "_Bool",                  unsigned char: "unsigned char",          \
-             char: "char",                     signed char: "signed char",            \
-        short int: "short int",         unsigned short int: "unsigned short int",     \
-              int: "int",                     unsigned int: "unsigned int",           \
-         long int: "long int",           unsigned long int: "unsigned long int",      \
-    long long int: "long long int", unsigned long long int: "unsigned long long int", \
-            float: "float",                         double: "double",                 \
-      long double: "long double",                   char *: "pointer to char",        \
-           void *: "pointer to void",                int *: "pointer to int",         \
-          default: "other")
-
-// https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/ source for appending strings
-
 #define BUFFER_SIZE 1024
 
-unsigned long getFileSize(char *fileP);
-
-char *extractFileContentTxt(char *filePath){
-    // printf("%s \n", filePath);
-
-    unsigned long size = getFileSize(filePath);
-    // printf("size: %ld \n", size);
-
-    FILE *file;
-    file = fopen(filePath, "r");
-    if(file == NULL){
-        printf("cannot get file\n");
-        return "NULL";
-    }
-
-    char txtFile[size + 1];
-    char line[size + 1];
-    while(fgets(line, size, file)){
-        strcat(txtFile, line);
-    }
-    strcat(txtFile, "\0");
-    // printf("%s\n", txtFile);
-
-    fclose(file);
-
-    char *txt = (char*)malloc(size + 1);
-    if (txt == NULL){
-        printf("not allocated properly \n");
-        return "NULL";
-    }
-    strcpy(txt, txtFile);
-    return txt;
-}
-
-unsigned long getFileSize(char *filePath){
-    FILE *file;
-    file = fopen(filePath, "rb");
-    if(file == NULL){
-        printf("cannot get file\n");
+unsigned long getFileSize(const char *filePath) {
+    FILE *file = fopen(filePath, "r");
+    if (file == NULL) {
+        perror("cannot open file");
         return 0;
     }
 
-    //Calculating size:
     fseek(file, 0, SEEK_END);
-    long fileSize = ftell(file);
+    long size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    //Close it after calculating size.
     fclose(file);
-    return fileSize + 1;
+    return (unsigned long)size;
 }
 
-int test(char *string){
-    // printf("%s \n", string);
-    char *i = string;
-    printf("testing\n%s\n", i);
-    return 0;
-}   
+char *extractFileContentTxt(const char *filePath) {
+    unsigned long size = getFileSize(filePath);
+    if (size == 0) {
+        return NULL;
+    }
 
-int main(){
-    char *fileContent;
-    unsigned long size = getFileSize("index.html");
-    fileContent = extractFileContentTxt("index.html");
+    FILE *file = fopen(filePath, "r");
+    if (file == NULL) {
+        perror("cannot open file");
+        return NULL;
+    }
 
-    char resp[999999] = "HTTP/1.0 200 OK\r\n"
-                      "Server: webserver-c\r\n"
-                      "Content-type: text/html\r\n\r\n";
+    // Dynamically allocate memory to hold the content of the file
+    char *content = (char *)malloc(size + 1); // +1 for the null terminator
+    if (content == NULL) {
+        perror("memory allocation failed");
+        fclose(file);
+        return NULL;
+    }
 
-    printf("%s \n", fileContent);
+    size_t readSize = fread(content, 1, size, file);
+    if (readSize != size) {
+        perror("reading file failed");
+        free(content);
+        fclose(file);
+        return NULL;
+    }
 
-    strcat(resp, fileContent);
-    strcat(resp, "\r\n");
-    // printf("%s \n", resp);
-    free(fileContent);
-    // initServer(resp);
+    content[size] = '\0';  // Null-terminate the string
+
+    fclose(file);
+    return content;
+}
+
+int main() {
+    char *fileContent = extractFileContentTxt("index.html");
+    char resp[getFileSize("index.html") + 73];
+    strcat(resp, "HTTP/1.0 200 OK\r\n");
+    strcat(resp,"Server: webserver-c\r\n");
+    strcat(resp, "Content-type: text/html\r\n\r\n");
+
+    if (fileContent) {
+        // printf("File content:\n%s\n", fileContent);
+        
+        strcat(resp, fileContent);
+        strcat(resp, "\r\n");
+
+        printf("resp: %s\n", resp);
+
+
+
+
+
+        free(fileContent);  // Don't forget to free the allocated memory!
+        initServer(resp);
+
+    } else {
+        printf("Failed to read file content.\n");
+    }
 
     return 0;
 }
