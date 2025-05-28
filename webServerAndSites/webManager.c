@@ -6,39 +6,66 @@
 
 // https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/ source for appending strings
 
-int main(){
-    // initServer();
+unsigned long getFileSize(char *fileP);
 
-    FILE* index;
-    index = fopen("index.html", "r");
-    if (index == NULL){
-        printf("cannot get file \n");
+char *extractFileContentTxt(char *filePath){
+    // printf("%s \n", filePath);
+
+    unsigned long size = getFileSize(filePath);
+    // printf("size: %ld \n", size);
+
+    FILE *file;
+    file = fopen(filePath, "r");
+    if(file == NULL){
+        printf("cannot get file\n");
+        return "NULL";
     }
 
-    // printf("%ld \n", file_size);
-
-    long size = 0;
-    char ch;
-    do{
-        ch = fgetc(index);
-        size += 1;
-
-    }while(ch != EOF);
-    printf("%ld \n", size);
-
-
+    char txtFile[size];
     char line[size];
-    char file[size];
-    while(fgets(line, size, index)){
-        strcat(file, line);
-        // printf("%s", line);
-    };
+    while(fgets(line, size, file)){
+        strcat(txtFile, line);
+    }
+    // printf("%s\n", txtFile);
 
-    printf("%s", file);
+    fclose(file);
 
-    fclose(index);
+    char *txt = (char*)malloc(size + 1);
+    if (txt == NULL){
+        printf("not allocated properly \n");
+        return "NULL";
+    }
+    strcpy(txt, txtFile);
+    return txt;
+}
 
+unsigned long getFileSize(char *filePath){
+    FILE *file;
+    file = fopen(filePath, "r");
+    if(file == NULL){
+        printf("cannot get file\n");
+        return 0;
+    }
 
+    //Calculating size:
+    long size = 0;
+    char c;
+    do{
+
+        c = fgetc(file);
+        size++;
+
+    }while(c != EOF);
+
+    //Close it after calculating size.
+    fclose(file);
+    return size;
+
+}
+
+int main(){
+    // initServer();
+    printf("file content:\n %s\n", extractFileContentTxt("index.html"));
 
     return 0;
 }
