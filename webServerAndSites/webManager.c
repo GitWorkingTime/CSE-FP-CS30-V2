@@ -66,25 +66,28 @@ char *extractFileContentTxt(const char *filePath) {
 }
 
 int main() {
-    char *fileContent = extractFileContentTxt("Pages/index.html");
+    char *fileContent = extractFileContentTxt("index.html");
+    const char *htmlHeader = "HTTP/1.0 200 OK\r\n"
+                             "Server: webserver-c\r\n"
+                             "Content-type: text/html\r\n\r\n";
 
-    const int headerSize = 73;
-    char resp;
-    long fileSize = getFileSize("Pages/index.html") + headerSize;
-    strcpy(resp, "HTTP/1.0 200 OK\r\n");
-    strcat(resp,"Server: webserver-c\r\n");
-    strcat(resp, "Content-type: text/html\r\n\r\n");
+    const int headerSize = strlen(htmlHeader);
+    long fileSize = getFileSize("index.html") + headerSize;
+    char *resp = malloc(fileSize + 1);
+
+    strcpy(resp, htmlHeader);
 
     if (fileContent) {
-        // printf("File content:\n%s\n", fileContent);
         
         strcat(resp, fileContent);
         strcat(resp, "\r\n");
 
-        printf("resp: %s\n", resp);
+        // printf("resp: %s\n", resp);
 
+        initServer(resp);
+
+        free(resp);
         free(fileContent);  // Don't forget to free the allocated memory!
-        // initServer(resp, "Pages/index.html");
 
     } else {
         printf("Failed to read file content.\n");

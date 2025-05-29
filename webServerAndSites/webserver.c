@@ -33,30 +33,10 @@ void printAddressProperties(struct sockaddr_in host_addr){
 	printf("\n");
 }
 
-int initServer(char *response, char *file){
+int initServer(char *response){
 	char buffer[BUFFER_SIZE];
-	// char resp[] = "HTTP/1.0 200 OK\r\n"
-	// 			  "Server: webserver-c\r\n"
-	// 			  "Content-type: text/html\r\n\r\n"
-	// 			  "<html> WEBSERVER IS UP AND RUNNING WOO </html>\r\n";
-
-	char post[] = "HTTP/1.0 200 OK\r\n"
-				  "Server: webserver-c\r\n"
-				  "Content-type: multiport/form-data\r\n\r\n";
-
-	FILE* fileToOpen = fopen(file, "r");
-	if (fileToOpen == NULL){
-		printf("cannot open file");
-		return 0;
-	}
-
-	fclose(fileToOpen);
-
-
-
-
 	char *resp = response;
-	printf("%s", resp);
+	// printf("%s", resp);
 
 	//Create socket
 	int mysock = createSocket();
@@ -69,8 +49,6 @@ int initServer(char *response, char *file){
 	host_addr.sin_family = AF_INET;
 	host_addr.sin_port = htons(PORT);
 	host_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	// printAddressProperties(host_addr);
 
 	//Create the client address
 	struct sockaddr_in client_addr;
@@ -144,15 +122,66 @@ int initServer(char *response, char *file){
 
 		printf("\n");
 
-		//Writing to the socket
-		int valwrite = write(newmysock, resp, strlen(resp));
 
-		//If there is an error, go to the next socket queued up
-		if (valwrite < 0){
+		char filePath[BUFFER_SIZE] = "."; //This represents the current directory
+		strcat(filePath, uri); //Append onto the filePath the file chosen
+
+		if (strcmp(uri, "/") == 0){ //strcmp compares two strings to see if a certain character(s) exists in both
+			strcpy(filePath, "./index.html");
+		}
+
+		FILE *requestedFile = fopen(filePath, "r");
+
+		//IF the file is not found, send a 404 error
+		if (requestedFile == NULL) {
+			char *not_found = "HTTP/1.0 404 Not Found\r\n"
+			                  "Content-Type: text/html\r\n\r\n"
+			                  "<h1>404 Not Found</h1>";
+			write(newmysock, not_found, strlen(not_found));
+			close(newmysock);
+			continue; //Go to the next iteration
+		}
+
+		//Determining content-type (a.k.a MIME TYPE)
+		char *content_type = "text/plain"; //Default type
+
+		//strstr is used to find the first instance of a selected string
+		if (strstr(filePath, ".html"))
+			content_type = "text/html";
+		else if (strstr(filePath, ".css"))
+			content_type = "text/css";
+
+		//Reading file content:
+		fseek(requestedFile, 0, SEEK_END);
+		long fsize = ftell(requestedFile);
+		rewind(requestedFile);
+
+		char *fileContent = malloc(fsize + 1);
+		fread(fileContent, 1, fsize, requestedFile);
+		fileContent[fsize] = 0;
+		fclose(requestedFile);
+
+		char header[BUFFER_SIZE];
+		snprintf(header, sizeof(header),
+			"HTTP/1.0 200 OK\r\n"
+			"Content-Type: %s\r\n"
+			"Content-Length: %ld\r\n\r\n",
+			content_type, fsize);
+
+		//Writing to the server:
+		int writeHeader = write(newmysock, header, strlen(header));
+		if(writeHeader < 0){
 			perror("webserver (write)");
 			continue;
 		}
 
+		int writeFile = write(newmysock, fileContent, fsize);
+		if(writeFile < 0){
+			perror("webserver (write)");
+			continue;
+		}
+
+		free(fileContent);
 		close(newmysock);
 	}
 	return 0;
