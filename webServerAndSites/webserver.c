@@ -33,6 +33,21 @@ void printAddressProperties(struct sockaddr_in host_addr){
 	printf("\n");
 }
 
+char *getContentType(char *filePath){
+	//Determining content-type (a.k.a MIME TYPE)
+	char *content_type = "text/plain"; //Default type
+
+	//strstr is used to find the first instance of a selected string
+	if (strstr(filePath, ".html"))
+		content_type = "text/html";
+	else if (strstr(filePath, ".css"))
+		content_type = "text/css";
+	else if(strstr(filePath, ".js")){
+		content_type = "text/js";
+	}
+	return content_type;
+}
+
 int initServer(char *response){
 	char buffer[BUFFER_SIZE];
 	char *resp = response;
@@ -142,20 +157,14 @@ int initServer(char *response){
 			continue; //Go to the next iteration
 		}
 
-		//Determining content-type (a.k.a MIME TYPE)
-		char *content_type = "text/plain"; //Default type
+		char *content_type = getContentType(filePath);
 
-		//strstr is used to find the first instance of a selected string
-		if (strstr(filePath, ".html"))
-			content_type = "text/html";
-		else if (strstr(filePath, ".css"))
-			content_type = "text/css";
-
-		//Reading file content:
+		//Get file size
 		fseek(requestedFile, 0, SEEK_END);
 		long fsize = ftell(requestedFile);
 		rewind(requestedFile);
 
+		//Reading file content
 		char *fileContent = malloc(fsize + 1);
 		fread(fileContent, 1, fsize, requestedFile);
 		fileContent[fsize] = 0;
