@@ -1,5 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
+/*
+
+colours:
+#e0d9d9
+#c9bcbc
+#f0f0f0
+#433bff
+*/
+
 body {
     background-color: #f0f0f0;
     font-family: "Inter", sans-serif;
@@ -9,4 +18,41 @@ body {
 
 h1 {
     color: #333;
+}
+
+.divUserInput{
+    display: inline-block;
+}
+
+.divMessage{
+    background-color: #e0d9d9;
+    border-radius: 10px;
+    padding: 0.75rem;
+}
+
+.messageTextArea{
+    border-radius: 5px;
+    border: none;
+    background-color: #f0f0f0;
+    width: 18rem;
+    height: 12rem;
+    font-family: "Inter", sans-serif;
+}
+
+.divImage{
+    background-color: #e0d9d9;
+    border-radius: 10px;
+    padding: 0.75rem;
+}
+
+.submit{
+    border-radius: 5px;
+    border: none;
+    font-family: "Inter", sans-serif;
+    font-size: 15px;
+    background-color: #e0d9d9;
+}
+
+.submit:hover{
+    background-color: #c9bcbc;
 }
