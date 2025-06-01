@@ -37,6 +37,8 @@ h1 {
     width: 18rem;
     height: 12rem;
     font-family: "Inter", sans-serif;
+    resize: none;
+    word-break: break-word;
 }
 
 .divImage{
