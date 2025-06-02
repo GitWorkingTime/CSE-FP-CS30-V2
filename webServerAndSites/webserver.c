@@ -43,7 +43,7 @@ char *getContentType(char *filePath){
 	else if (strstr(filePath, ".css"))
 		content_type = "text/css";
 	else if(strstr(filePath, ".js")){
-		content_type = "text/js";
+		content_type = "application/javascript";
 	}
 	return content_type;
 }
@@ -100,7 +100,7 @@ int initServer(char *response){
 			//Go to the next socket queued
 			continue; 
 		}
-		printf("connnection accepted: %d\n", newmysock);
+		printf("connnection accepted:\n");
 
 		//Get client address
 		int clientsock = getsockname(newmysock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addrlen);
@@ -128,6 +128,53 @@ int initServer(char *response){
 
 		//the '%s' refers to the string formatting: each variable is formatted as a string
 		sscanf(buffer, "%s %s %s", method, uri, version);
+
+		if(strcmp(method, "POST") == 0 && strcmp(uri, "/api/chat") == 0){
+			//Find content-length from headers
+			int contentLen = 0;
+			char *contLenPtr = strstr(buffer, "Content-Length:");
+
+			if(contLenPtr){
+				sscanf(contLenPtr, "Content-Length: %d", &contentLen);
+			}
+
+			char *bodyStart = strstr(buffer, "\r\n\r\n");
+			if(!bodyStart){
+				fprintf(stderr, "Invalid POST request: missing body\n");
+				close(newmysock);
+				continue;
+			}
+			bodyStart += 4;
+
+			int headerLen = bodyStart - buffer;
+			int bodyLen = valread - headerLen;
+
+			char *body = malloc(contentLen + 1);
+			memcpy(body, bodyStart, bodyLen);
+
+			//If body not complete, read the rest
+			while (bodyLen < contentLen){
+				int bytes = read(newmysock, body + bodyLen, contentLen - bodyLen);
+				if(bytes <= 0){
+					break;
+				}
+				bodyLen += bytes;
+			}
+			body[bodyLen] = '\0';
+
+			printf("Received JSON: \n%s\n", body);
+
+		    char *okResp = "HTTP/1.0 200 OK\r\n"
+		                   "Content-Type: application/json\r\n\r\n"
+		                   "{\"status\": \"success\"}";
+
+		    write(newmysock, okResp, strlen(okResp));
+		    free(body);
+		    close(newmysock);
+		    continue;
+
+		}
+
 
 		//Printing the request header
 		printf("%s %s %s\n", 
