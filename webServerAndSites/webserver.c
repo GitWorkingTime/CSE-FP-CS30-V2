@@ -25,6 +25,23 @@ int createSocket(){
 	return mysock;
 }
 
+int saveJSONToFile(const char *filepath, const char *JSONData) {
+    FILE *fp = fopen(filepath, "w");  // Open file for writing (overwrite)
+    if (fp == NULL) {
+        perror("Failed to open file for writing");
+        return -1;
+    }
+
+    if (fprintf(fp, "%s", JSONData) < 0) {
+        perror("Failed to write JSON to file");
+        fclose(fp);
+        return -1;
+    }
+
+    fclose(fp);
+    return 0;
+}
+
 void printAddressProperties(struct sockaddr_in host_addr){
 	printf("host_addr.sin_family: \t %d\n", host_addr.sin_family);
 	printf("host_addr.sin_port: \t %d\n", host_addr.sin_port);
@@ -49,6 +66,8 @@ char *getContentType(char *filePath){
 }
 
 int initServer(char *response){
+	
+
 	char buffer[BUFFER_SIZE];
 	char *resp = response;
 	// printf("%s", resp);
@@ -163,6 +182,11 @@ int initServer(char *response){
 			body[bodyLen] = '\0';
 
 			printf("Received JSON: \n%s\n", body);
+			if(saveJSONToFile("uploads/received.json", body) == 0){
+				printf("JSON saved successfully!\n");
+			}else{
+				fprintf(stderr, "Failed to save JSON file. \n");
+			}
 
 		    char *okResp = "HTTP/1.0 200 OK\r\n"
 		                   "Content-Type: application/json\r\n\r\n"
@@ -174,7 +198,6 @@ int initServer(char *response){
 		    continue;
 
 		}
-
 
 		//Printing the request header
 		printf("%s %s %s\n", 
