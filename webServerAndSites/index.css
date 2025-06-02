@@ -58,3 +58,10 @@ h1 {
 .submit:hover{
     background-color: #c9bcbc;
 }
+
+.divUserDisplay{
+    background-color: #e0d9d9;
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: left;
+}

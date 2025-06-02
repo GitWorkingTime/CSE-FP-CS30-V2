@@ -11,11 +11,11 @@
 	<h1>Hello world!</h1>
 	<p>Text from C server!</p>
 	<div class="divUserInput">
-		<form method="post" class="chatMessages" enctype="multiport/form-data">
+		<form method="post" id="chatMessages" class="chatMessages" enctype="multipart/form-data">
 			<div class="divMessage">
 				<label for="message">Message:</label>
 				<br>
-				<textarea class="messageTextArea" id="message" name="message" placeholder="Enter Chat Message" required></textarea>
+				<textarea class="messageTextArea" id="message" name="message" placeholder="Enter Chat Message"></textarea>
 				<br>
 			</div>
 
@@ -23,12 +23,16 @@
 			<div class="divImage">
 				<label for="image">Image:</label>
 				<br>
-				<input type="file" id="image" accept="image/*"><br>
+				<input type="file" id="image" name="image" accept="image/*"><br>
 			</div>
 			<br>
 			<input class="submit" type="submit" value="submit">
+			<br>
 		</form>
+	</div>
 
+	<div id="divUserDisplay" class="divUserDisplay">
+		
 	</div>
 
 
