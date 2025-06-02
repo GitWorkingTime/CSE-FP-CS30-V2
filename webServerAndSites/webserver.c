@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -65,8 +67,22 @@ char *getContentType(char *filePath){
 	return content_type;
 }
 
-int initServer(char *response){
+void ensureUploadsFolderExists() {
+    struct stat st = {0};
 
+    if (stat("uploads", &st) == -1) {
+        if (mkdir("uploads", 0755) == 0) {
+            printf("Created 'uploads' directory.\n");
+        } else {
+            perror("Failed to create 'uploads' directory");
+        }
+    } else {
+        printf("'uploads' directory already exists.\n");
+    }
+}
+
+int initServer(char *response){
+	ensureUploadsFolderExists();
 
 	char buffer[BUFFER_SIZE];
 	char *resp = response;
@@ -153,10 +169,38 @@ int initServer(char *response){
 			int contentLen = 0;
 			char *contLenPtr = strstr(buffer, "Content-Length:");
 
+			//Find the content-type from the header
+			char *contentTypePtr = strstr(buffer, "Content-Type:");
+			char contentType[128] = {0};
+			char boundary[128] = {0};
+
+			if(contentTypePtr){
+				//Reads the formatted input (i.e contentType) and stores it in contentTypePtr
+				sscanf(contentTypePtr, "Content-Type: %127[^\r\n]", contentType);
+
+				if(strstr(contentType, "multipart/form-data") != NULL){
+					char *bound = strstr(contentType, "boundary=");
+					if(bound){
+						strcpy(boundary, bound + strlen("boundary="));
+
+						//Boundary may be quoted, strip quotes if present:
+						if(boundary[0] == '"'){
+							memmove(boundary, boundary+1, strlen(boundary));
+							boundary[strlen(boundary) - 1] = '\0';
+						}
+					}else{
+						fprintf(stderr, "No boundary found in multipart/form-data\n");
+						close(newmysock);
+						continue;
+					}
+				}
+
+			}
+
 			if(contLenPtr){
 				sscanf(contLenPtr, "Content-Length: %d", &contentLen);
 			}
-
+			
 			char *bodyStart = strstr(buffer, "\r\n\r\n");
 			if(!bodyStart){
 				fprintf(stderr, "Invalid POST request: missing body\n");
@@ -181,21 +225,118 @@ int initServer(char *response){
 			}
 			body[bodyLen] = '\0';
 
-			printf("Received JSON: \n%s\n", body);
-			if(saveJSONToFile("uploads/received.json", body) == 0){
-				printf("JSON saved successfully!\n");
-			}else{
-				fprintf(stderr, "Failed to save JSON file. \n");
+			if(strstr(contentType, "application/json") != NULL){
+				printf("Received JSON: \n%s\n", body);
+				if(saveJSONToFile("uploads/received.json", body) == 0){
+					printf("JSON saved successfully!\n");
+				}else{
+					fprintf(stderr, "Failed to save JSON file. \n");
+				}
+
+				char *okResp = "HTTP/1.0 200 OK\r\n"
+							"Content-Type: application/json\r\n\r\n"
+							"{\"status\": \"success\"}";
+
+				write(newmysock, okResp, strlen(okResp));
+				free(body);
+				close(newmysock);
+				continue;
+			}else if(strstr(contentType, "multipart/form-data") != NULL){
+				printf("Content is multipart/form-data\n");
+
+				//Construct boundary strings
+				char boundStart[256];
+				char boundEnd[256];
+				snprintf(boundStart, sizeof(boundStart), "--%s", boundary);
+				snprintf(boundEnd, sizeof(boundEnd), "--%s--", boundary);
+
+				char *partStart = strstr(body, boundStart);
+				if(!partStart){
+					fprintf(stderr, "No multipart boundary start found\n");
+					free(body);
+					close(newmysock);
+					continue;
+				}
+
+				printf("boundary start: %s\n boundary end: %s\n", boundStart, boundEnd);
+
+				partStart += strlen(boundStart) + 2; //Skip boundary and CLRF
+
+				//Find the next boundary (end of this part)
+				char *partEnd = strstr(partStart, boundStart);
+				if(!partEnd){
+					partEnd = strstr(partStart, boundEnd);
+					if(!partEnd){
+						fprintf(stderr, "No mulipart boundary end found\n");
+						free(body);
+						close(newmysock);
+						continue;
+					}
+				}
+
+				//Extract headers of the part
+				char *headEnd = strstr(partStart, "\r\n\r\n");
+				if(!headEnd){
+					fprintf(stderr, "Invalid multipart format: no header/body seperation\n");
+					free(body);
+					close(newmysock);
+					continue;
+				}
+
+				int headLen = headEnd - partStart;
+				int dataLen = partEnd - (headEnd + 4);
+
+				char headers[headLen + 1];
+				strncpy(headers, partStart, headLen);
+
+				//Parsing content-disposition to get filename
+				char *filenamePtr= strstr(headers, "filename=\"");
+				char filename[256] = {0};
+				if(filenamePtr){
+					filenamePtr + strlen("filename=\"");
+					char *filenameEnd = strchr(filenamePtr, '"');
+					if (filenameEnd){
+						int filenameLen = filenameEnd - filenamePtr;
+						strncpy(filename, filenamePtr, filenameLen);
+						filename[filenameLen] = '\0';
+					}
+				}else{
+					fprintf(stderr, "No filename in multipart part\n");
+					free(body);
+					close(newmysock);
+					continue;
+				}
+
+				//Saving the file content as raw bytes
+				char filepath[512];
+				snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
+
+				printf("filepath: %s\n", filepath);
+				FILE *fp = fopen(filepath, "wb");
+				if(!fp){
+					perror("failed to open file for writing uploaded data (fopen)");
+					printf("Failed to open file\n");
+					free(body);
+					close(newmysock);
+					continue;
+				}
+				printf("File created\n");
+
+				fwrite(headEnd + 4, 1, dataLen, fp);
+				fclose(fp);
+
+				printf("Saved uploaded file: %s\n", filepath);
+
+
+				char *okResp = "HTTP/1.0 200 OK\r\n"
+							"Content-Type: application/json\r\n\r\n"
+							"{\"status\": \"success\", \"file\": \"uploaded\"}";
+
+				write(newmysock, okResp, strlen(okResp));
+				free(body);
+				close(newmysock);
+				continue;
 			}
-
-		    char *okResp = "HTTP/1.0 200 OK\r\n"
-		                   "Content-Type: application/json\r\n\r\n"
-		                   "{\"status\": \"success\"}";
-
-		    write(newmysock, okResp, strlen(okResp));
-		    free(body);
-		    close(newmysock);
-		    continue;
 		}
 
 		//Printing the request header

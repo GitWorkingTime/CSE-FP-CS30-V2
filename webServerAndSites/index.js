@@ -1,3 +1,13 @@
+function isJSON(str){
+    try{
+        JSON.parse(str);
+        return true;
+    } catch(e){
+        return false;
+    }
+}
+
+
 /*
 Because this file is called in the <head> portion of the html file, we will use
 'DOMContentLoaded' event to ensure that all HTML and associated files are loaded
@@ -11,36 +21,60 @@ document.addEventListener('DOMContentLoaded', function(){
         const formData = new FormData(this);
         const jsonObj = {};
 
-        //Copies all key-value pairs from the FormData and adds it to a regular JS object
-        formData.forEach((value, key) =>{
-            jsonObj[key] = value;
-        });
+        let hasFile = false;
+        for(let value of formData.values()){
+            if (value instanceof File && value.size > 0){
+                hasFile = true;
+                break;
+            }
+        }
+        if (hasFile == true){
+            fetch('/api/chat',{
 
-        const jsonString = JSON.stringify(jsonObj);
-        console.log(jsonString);
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data =>{
+                console.log("Server Response:", data);
+            })
+            .catch(error =>{
+                console.error("Error:", error);
+            });
+        } else{
+            //Copies all key-value pairs from the FormData and adds it to a regular JS object
+            formData.forEach((value, key) =>{
+                jsonObj[key] = value;
+            });
 
-        const userMsg = jsonObj.message;
-        const displayDiv = document.getElementById('divUserDisplay');
+            const jsonString = JSON.stringify(jsonObj);
+            console.log(jsonString);
 
-        const userMsgDisplay = document.createElement('div');
-        userMsgDisplay.textContent = userMsg;
-        displayDiv.appendChild(userMsgDisplay);
+            const userMsg = jsonObj.message;
+            const displayDiv = document.getElementById('divUserDisplay');
 
-        fetch('/api/chat',{
+            const userMsgDisplay = document.createElement('div');
+            userMsgDisplay.textContent = userMsg;
+            displayDiv.appendChild(userMsgDisplay);
 
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: jsonString
-        })
-        .then(response => response.text())
-        .then(data =>{
-            console.log("Server Response:", data);
-        })
-        .catch(error =>{
-            console.error("Error:", error);
-        })
+
+            fetch('/api/chat',{
+
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: jsonString
+            })
+            .then(response => response.text())
+            .then(data =>{
+                console.log("Server Response:", data);
+            })
+            .catch(error =>{
+                console.error("Error:", error);
+            })
+        }
+
 
     }); 
 
