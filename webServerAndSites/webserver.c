@@ -5,11 +5,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 1024
 
 /*
 This local web server can be accessed via:
@@ -40,30 +38,17 @@ char *getContentType(char *filePath){
 	char *content_type = "text/plain"; //Default type
 
 	//strstr is used to find the first instance of a selected string
-	if (strstr(filePath, ".html")){
+	if (strstr(filePath, ".html"))
 		content_type = "text/html";
-	}
-	else if (strstr(filePath, ".css")){
+	else if (strstr(filePath, ".css"))
 		content_type = "text/css";
-	}
 	else if(strstr(filePath, ".js")){
-		content_type = "application/javascript";
+		content_type = "text/js";
 	}
-	else if (strstr(filePath, ".jpg") || strstr(filePath, ".jpeg")){
-		content_type = "image/jpeg";
-	}
-	else if (strstr(filePath, ".png")){
-		content_type = "image/png";
-	}
-	else if (strstr(filePath, ".gif")){
-		content_type = "image/gif";
-	}
-
 	return content_type;
 }
 
 int initServer(char *response){
-	mkdir("uploads", 0777);
 	char buffer[BUFFER_SIZE];
 	char *resp = response;
 	// printf("%s", resp);
@@ -126,25 +111,13 @@ int initServer(char *response){
 		}
 
 		//Read the accepted socket:
-		int totalRead = 0;
-		while(1){
-			int bytesRead = read(newmysock, buffer + totalRead, sizeof(buffer) - totalRead - 1);
-			if (bytesRead <= 0){
-				break;
-			}
+		int valread = read(newmysock, buffer, BUFFER_SIZE);
 
-			totalRead += bytesRead;
-			if(totalRead >= sizeof(buffer - 1)){
-				break;
-			}
+		//Again, if the read returns an error (i.e a -1), skip to the next accepted socket
+		if (valread < 0){
+			perror("webserver (read");
+			continue;
 		}
-		buffer[totalRead] = '\0'; 
-
-		// //Again, if the read returns an error (i.e a -1), skip to the next accepted socket
-		// if (valread < 0){
-		// 	perror("webserver (read");
-		// 	continue;
-		// }
 
 		//Printing the IP address and port of the client after it has been read
 		printf("[%s:%u]\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
@@ -156,136 +129,6 @@ int initServer(char *response){
 		//the '%s' refers to the string formatting: each variable is formatted as a string
 		sscanf(buffer, "%s %s %s", method, uri, version);
 
-		if(strmp(method, "GET") == 0 && strcmp(uri, "/chat") == 0){
-			FILE *jsonFile = fopen("uploads/data.json", "r");
-			if(!jsonFile){
-		        char *not_found = "HTTP/1.0 404 Not Found\r\n"
-                  "Content-Type: application/json\r\n\r\n"
-                  "{\"error\": \"Data not found\"}";
-		        write(newmysock, not_found, strlen(not_found));
-		        close(newmysock);
-		        continue;
-			}
-
-			//Reading the JSON contents
-			fseek(jsonFile, 0, SEEK_END);
-			long fileSize = ftell(jsonFile);
-			rewind(jsonFile);
-
-			char *jsonContent = malloc(fileSize + 1);
-			fread(jsonContent, 1, fileSize, jsonFile);
-			jsonContent[fileSize] = 0;
-			fclose(jsonFile);
-			
-		    char header[BUFFER_SIZE];
-		    snprintf(header, sizeof(header),
-		        "HTTP/1.0 200 OK\r\n"
-		        "Content-Type: application/json\r\n"
-		        "Content-Length: %ld\r\n\r\n", fsize);
-
-		    write(newmysock, header, strlen(header));
-		    write(newmysock, jsonContent, fsize);
-		    free(jsonContent);
-		    close(newmysock);
-		    continue;
-		}
-
-		if(strcmp(method, "POST") == 0 && strstr(uri, "/") != NULL){
-			char *contentTypeHeader = strstr(buffer, "Content-Type: multipart/form-data;");
-			if(contentTypeHeader){
-				char *boundaryStart = strstr(contentTypeHeader, "boundary=");
-				if(!boundaryStart){
-					continue;
-				}
-
-				char  boundary[256];
-				sscanf(boundaryStart, "boundary=%s", boundary);
-
-				//Form boundary string with '--'
-				char fullBoundary[260];
-				snprintf(fullBoundary, sizeof(fullBoundary), "--%s", boundary);
-
-				//Find start of body
-				char *body = strstr(buffer, "\r\n\r\n");
-				if(!body){
-					continue;
-				}
-				body += 4;
-
-				//Parsing for the message part
-				char *messagePart = strstr(body, "name=\"message\"");
-				char message[1024] = {0};
-				if(messagePart){
-					char *msgStart = strstr(messagePart, "\r\n\r\n");
-					if(msgStart){
-						msgStart += 4;
-						char *msgEnd = strstr(msgStart, fullBoundary);
-						if(msgEnd && (msgEnd - msgStart) < sizeof(message)){
-							strncpy(message, msgStart, msgEnd - msgStart - 2);
-							message[msgEnd - msgStart - 2] = '\0';
-						}
-					}
-				}
-
-				//Parsing for the image part
-				char *imagePart = strstr(body, "name=\"image\"");
-				if(imagePart){
-					//Extract filename
-					char *filenameStart = strstr(imagePart, "filename=\"");
-					if(!filenameStart){
-						continue;
-					}
-					filenameStart += 10;
-
-					char *filenameEnd = strchr(filenameStart, '"');
-					char filename[256] = {0};
-					strncpy(filename, filenameStart, filenameEnd - filenameStart);
-
-					//Find the image data
-					char *imgDataStart = strstr(imagePart, "\r\n\r\n");
-					if(!imgDataStart){
-						continue;
-					}
-					imgDataStart += 4;
-
-					//Find the end of the image data using the boundary
-					char *imgDataEnd = strstr(imgDataStart, fullBoundary);
-					if(!imgDataEnd){
-						continue;
-					}
-					long imgSize = imgDataEnd - imgDataStart - 2;
-
-					//Save the image to file
-					char imgPath[512];
-					snprintf(imgPath, sizeof(imgPath), "uploads/%s", filename);
-					FILE *imgFile = fopen(imgPath, "wb");
-					if (imgFile == NULL){
-						printf("image file not opened!");
-					}
-
-					if(imgFile){
-						fwrite(imgDataStart, 1, imgSize, imgFile);
-						fclose(imgFile);
-					}
-
-					//Save the message to JSON
-					FILE *jsonFile = fopen("uploads/data.json", "w");
-					if(jsonFile){
-						fprintf(jsonFile, 
-							"{\n  \"message\": \"%s\",\n  \"image\": \"%s\"\n}\n"
-							, message, filename);
-						fclose(jsonFile);
-					}
-					// Respond
-		            char *response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nMessage and image saved.";
-		            write(newmysock, response, strlen(response));
-
-				}
-
-			}
-
-		}
-
 		//Printing the request header
 		printf("%s %s %s\n", 
 			   method,
@@ -296,22 +139,13 @@ int initServer(char *response){
 
 
 		char filePath[BUFFER_SIZE] = "."; //This represents the current directory
-		if(strncmp(uri, "/uploads/", 9) == 0){
-			snprintf(filePath, sizeof(filePath), ".%s", uri);
-		}else if(strcmp(uri, "/") == 0){
-			strcpy(filePath, "./index.html");
-		}else{
-			snprintf(filePath, sizeof(filePath), ".%s", uri);
-		}
-
-
+		strcat(filePath, uri); //Append onto the filePath the file chosen
 
 		if (strcmp(uri, "/") == 0){ //strcmp compares two strings to see if a certain character(s) exists in both
 			strcpy(filePath, "./index.html");
 		}
 
-		const char *mode = strstr(filePath, ".jpg") || strstr(filePath, ".png") ? "rb" : "r";
-		FILE *requestedFile = fopen(filePath, mode);
+		FILE *requestedFile = fopen(filePath, "r");
 
 		//IF the file is not found, send a 404 error
 		if (requestedFile == NULL) {
