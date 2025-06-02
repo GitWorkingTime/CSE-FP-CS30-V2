@@ -19,6 +19,12 @@ document.addEventListener('DOMContentLoaded', function(){
         const jsonString = JSON.stringify(jsonObj);
         console.log(jsonString);
 
+        const userMsg = jsonObj.message;
+        const displayDiv = document.getElementById('divUserDisplay');
+
+        const userMsgDisplay = document.createElement('div');
+        userMsgDisplay.textContent = userMsg;
+        displayDiv.appendChild(userMsgDisplay);
 
         fetch('/api/chat',{
 

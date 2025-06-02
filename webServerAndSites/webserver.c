@@ -66,7 +66,7 @@ char *getContentType(char *filePath){
 }
 
 int initServer(char *response){
-	
+
 
 	char buffer[BUFFER_SIZE];
 	char *resp = response;
@@ -196,7 +196,6 @@ int initServer(char *response){
 		    free(body);
 		    close(newmysock);
 		    continue;
-
 		}
 
 		//Printing the request header
