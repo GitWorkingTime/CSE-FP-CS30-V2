@@ -16,8 +16,6 @@ This local web server can be accessed via:
 	http://localhost:8080
 */
 
-
-
 int createSocket(){
 	int mysock = socket(AF_INET, SOCK_STREAM, 0);
 	if (mysock == -1){
@@ -62,103 +60,6 @@ char *getContentType(char *filePath){
 	}
 
 	return content_type;
-}
-
-char *get_boundary(char *buffer) {
-    char *ct = strstr(buffer, "Content-Type: multipart/form-data;");
-    if (!ct) return NULL;
-
-    char *boundary_str = strstr(ct, "boundary=");
-    if (!boundary_str) return NULL;
-
-    boundary_str += strlen("boundary=");
-
-    // The boundary may be followed by \r\n or end of header
-    char *end = strchr(boundary_str, '\r');
-    if (!end) end = strchr(boundary_str, '\n');
-    int len = end ? (end - boundary_str) : strlen(boundary_str);
-
-    char *boundary = malloc(len + 3); // 2 for "--" + 1 for '\0'
-    if (!boundary) return NULL;
-
-    strcpy(boundary, "--");  // prefix boundary with --
-    strncat(boundary, boundary_str, len);
-
-    return boundary;
-}
-
-void handle_multipart(char *body, int bodyLength, char *boundary, char *savedFilename, size_t filenameSize) {
-    // body is the POST body only, length is bodyLength
-    // boundary is the multipart boundary string, e.g. "--boundary123"
-    // Your parsing code here uses these parameters only
-
-    char *part_start = body;
-
-    while (part_start < body + bodyLength) {
-        char *next_boundary = strstr(part_start, boundary);
-        if (!next_boundary) break;
-
-        // move past the boundary line
-        part_start = next_boundary + strlen(boundary);
-
-        // skip optional CRLF after boundary
-        if (part_start[0] == '\r' && part_start[1] == '\n')
-            part_start += 2;
-
-        // find the next boundary (end of this part)
-        next_boundary = strstr(part_start, boundary);
-        if (!next_boundary) break;
-
-        int part_len = next_boundary - part_start;
-
-        // parse headers in this part
-        char *header_end = strstr(part_start, "\r\n\r\n");
-        if (!header_end) break;
-
-        int header_len = header_end - part_start;
-        char *headers = malloc(header_len + 1);
-        if (!headers) break;
-        memcpy(headers, part_start, header_len);
-        headers[header_len] = '\0';
-
-        char *filename_pos = strstr(headers, "filename=\"");
-        if (filename_pos) {
-            filename_pos += strlen("filename=\"");
-            char *filename_end = strchr(filename_pos, '"');
-            if (!filename_end) {
-                free(headers);
-                break;
-            }
-            int filename_len = filename_end - filename_pos;
-            char filename[256];
-            strncpy(filename, filename_pos, filename_len);
-            filename[filename_len] = '\0';
-
-            printf("Uploading file: %s\n", filename);
-
-            strncpy(savedFilename, filename, filenameSize - 1);
-            savedFilename[filenameSize - 1] = '\0';
-
-            // file data starts after headers + 4 bytes (\r\n\r\n)
-            char *file_data = header_end + 4;
-            int file_data_len = part_len - (file_data - part_start);
-            printf("Saving file: %s, size: %d bytes\n", filename, file_data_len);
-
-            char filePath[512];
-            snprintf(filePath, sizeof(filePath), "uploads/%s", filename);
-            FILE *fp = fopen(filePath, "wb");
-            if (fp) {
-                fwrite(file_data, 1, file_data_len, fp);
-                fclose(fp);
-                printf("File saved successfully\n");
-            } else {
-                perror("fopen");
-            }
-        }
-
-        free(headers);
-        part_start = next_boundary + strlen(boundary);
-    }
 }
 
 int initServer(char *response){
@@ -225,13 +126,25 @@ int initServer(char *response){
 		}
 
 		//Read the accepted socket:
-		int valread = read(newmysock, buffer, BUFFER_SIZE);
+		int totalRead = 0;
+		while(1){
+			int bytesRead = read(newmysock, buffer + totalRead, sizeof(buffer) - totalRead - 1);
+			if (bytesRead <= 0){
+				break;
+			}
 
-		//Again, if the read returns an error (i.e a -1), skip to the next accepted socket
-		if (valread < 0){
-			perror("webserver (read");
-			continue;
+			totalRead += bytesRead;
+			if(totalRead >= sizeof(buffer - 1)){
+				break;
+			}
 		}
+		buffer[totalRead] = '\0'; 
+
+		// //Again, if the read returns an error (i.e a -1), skip to the next accepted socket
+		// if (valread < 0){
+		// 	perror("webserver (read");
+		// 	continue;
+		// }
 
 		//Printing the IP address and port of the client after it has been read
 		printf("[%s:%u]\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
@@ -243,98 +156,135 @@ int initServer(char *response){
 		//the '%s' refers to the string formatting: each variable is formatted as a string
 		sscanf(buffer, "%s %s %s", method, uri, version);
 
-		if(strcmp(method, "POST") == 0 && strcmp(uri, "/api") == 0){
-			char *contentLengthString = strstr(buffer, "Content-Length:");
-		    int contentLength = 0;
-		    if (contentLengthString){
-		        sscanf(contentLengthString, "Content-Length: %d", &contentLength);
-		    }
-
-		    // Determine if this is JSON or multipart/form-data
-		    char *contentType = strstr(buffer, "Content-Type:");
-		    if (!contentType) {
+		if(strmp(method, "GET") == 0 && strcmp(uri, "/chat") == 0){
+			FILE *jsonFile = fopen("uploads/data.json", "r");
+			if(!jsonFile){
+		        char *not_found = "HTTP/1.0 404 Not Found\r\n"
+                  "Content-Type: application/json\r\n\r\n"
+                  "{\"error\": \"Data not found\"}";
+		        write(newmysock, not_found, strlen(not_found));
 		        close(newmysock);
 		        continue;
-		    }
+			}
 
-		    // Move to value of Content-Type
-		    contentType = strchr(contentType, ' ') + 1;
+			//Reading the JSON contents
+			fseek(jsonFile, 0, SEEK_END);
+			long fileSize = ftell(jsonFile);
+			rewind(jsonFile);
 
-		    char *body = strstr(buffer, "\r\n\r\n");
-		    if (!body) {
-		        close(newmysock);
-		        continue;
-		    }
-		    body += 4;
+			char *jsonContent = malloc(fileSize + 1);
+			fread(jsonContent, 1, fileSize, jsonFile);
+			jsonContent[fileSize] = 0;
+			fclose(jsonFile);
+			
+		    char header[BUFFER_SIZE];
+		    snprintf(header, sizeof(header),
+		        "HTTP/1.0 200 OK\r\n"
+		        "Content-Type: application/json\r\n"
+		        "Content-Length: %ld\r\n\r\n", fsize);
 
-		    // Calculate how much of the body is already read
-		    int bodyLength = valread - (body - buffer);
-
-		    // Allocate full body buffer
-		    char *requestBody = malloc(contentLength + 1);
-		    if (!requestBody) {
-		        perror("malloc");
-		        close(newmysock);
-		        continue;
-		    }
-		    requestBody[contentLength] = '\0';
-
-		    memcpy(requestBody, body, bodyLength);
-
-		    // Read any remaining body
-		    while (bodyLength < contentLength) {
-		        int bytesRead = read(newmysock, requestBody + bodyLength, contentLength - bodyLength);
-		        if (bytesRead <= 0) break;
-		        bodyLength += bytesRead;
-		    }
-
-		    // Handle multipart/form-data
-		    if (strstr(contentType, "multipart/form-data") != NULL) {
-		    	char *boundary = get_boundary(buffer);
-		    	char savedFilename[256] = {0};
-		    	if(boundary){
-		    		handle_multipart(requestBody, contentLength, boundary, savedFilename, sizeof(savedFilename));
-		    		free(boundary);
-		    	}
-		        
-		        // Send response
-		        char response[256];
-				snprintf(response, sizeof(response),
-				    "HTTP/1.0 200 OK\r\n"
-				    "Content-Type: application/json\r\n\r\n"
-				    "{\"status\":\"File uploaded\", \"filename\":\"%s\"}",
-				    savedFilename
-				);
-		        write(newmysock, response, strlen(response));
-
-		    } else if (strstr(contentType, "application/json") != NULL) {
-		        // Save JSON as before
-		        requestBody[contentLength] = '\0';
-
-		        FILE *fp = fopen("received.json", "w");
-		        if (fp) {
-		        	fprintf(fp, "%s", requestBody);
-		        	fclose(fp);
-		        } 
-
-		        const char *jsonResponse =
-		            "HTTP/1.0 200 OK\r\n"
-		            "Content-Type: application/json\r\n\r\n"
-		            "{\"status\":\"JSON received\"}";
-		        write(newmysock, jsonResponse, strlen(jsonResponse));
-		    } else {
-		        const char *badRequest =
-		            "HTTP/1.0 400 Bad Request\r\n"
-		            "Content-Type: text/plain\r\n\r\n"
-		            "Unsupported Content-Type";
-		        write(newmysock, badRequest, strlen(badRequest));
-		    }
-
-		    free(requestBody);
+		    write(newmysock, header, strlen(header));
+		    write(newmysock, jsonContent, fsize);
+		    free(jsonContent);
 		    close(newmysock);
 		    continue;
 		}
 
+		if(strcmp(method, "POST") == 0 && strstr(uri, "/") != NULL){
+			char *contentTypeHeader = strstr(buffer, "Content-Type: multipart/form-data;");
+			if(contentTypeHeader){
+				char *boundaryStart = strstr(contentTypeHeader, "boundary=");
+				if(!boundaryStart){
+					continue;
+				}
+
+				char  boundary[256];
+				sscanf(boundaryStart, "boundary=%s", boundary);
+
+				//Form boundary string with '--'
+				char fullBoundary[260];
+				snprintf(fullBoundary, sizeof(fullBoundary), "--%s", boundary);
+
+				//Find start of body
+				char *body = strstr(buffer, "\r\n\r\n");
+				if(!body){
+					continue;
+				}
+				body += 4;
+
+				//Parsing for the message part
+				char *messagePart = strstr(body, "name=\"message\"");
+				char message[1024] = {0};
+				if(messagePart){
+					char *msgStart = strstr(messagePart, "\r\n\r\n");
+					if(msgStart){
+						msgStart += 4;
+						char *msgEnd = strstr(msgStart, fullBoundary);
+						if(msgEnd && (msgEnd - msgStart) < sizeof(message)){
+							strncpy(message, msgStart, msgEnd - msgStart - 2);
+							message[msgEnd - msgStart - 2] = '\0';
+						}
+					}
+				}
+
+				//Parsing for the image part
+				char *imagePart = strstr(body, "name=\"image\"");
+				if(imagePart){
+					//Extract filename
+					char *filenameStart = strstr(imagePart, "filename=\"");
+					if(!filenameStart){
+						continue;
+					}
+					filenameStart += 10;
+
+					char *filenameEnd = strchr(filenameStart, '"');
+					char filename[256] = {0};
+					strncpy(filename, filenameStart, filenameEnd - filenameStart);
+
+					//Find the image data
+					char *imgDataStart = strstr(imagePart, "\r\n\r\n");
+					if(!imgDataStart){
+						continue;
+					}
+					imgDataStart += 4;
+
+					//Find the end of the image data using the boundary
+					char *imgDataEnd = strstr(imgDataStart, fullBoundary);
+					if(!imgDataEnd){
+						continue;
+					}
+					long imgSize = imgDataEnd - imgDataStart - 2;
+
+					//Save the image to file
+					char imgPath[512];
+					snprintf(imgPath, sizeof(imgPath), "uploads/%s", filename);
+					FILE *imgFile = fopen(imgPath, "wb");
+					if (imgFile == NULL){
+						printf("image file not opened!");
+					}
+
+					if(imgFile){
+						fwrite(imgDataStart, 1, imgSize, imgFile);
+						fclose(imgFile);
+					}
+
+					//Save the message to JSON
+					FILE *jsonFile = fopen("uploads/data.json", "w");
+					if(jsonFile){
+						fprintf(jsonFile, 
+							"{\n  \"message\": \"%s\",\n  \"image\": \"%s\"\n}\n"
+							, message, filename);
+						fclose(jsonFile);
+					}
+					// Respond
+		            char *response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nMessage and image saved.";
+		            write(newmysock, response, strlen(response));
+
+				}
+
+			}
+
+		}
 
 		//Printing the request header
 		printf("%s %s %s\n", 
@@ -360,7 +310,8 @@ int initServer(char *response){
 			strcpy(filePath, "./index.html");
 		}
 
-		FILE *requestedFile = fopen(filePath, "r");
+		const char *mode = strstr(filePath, ".jpg") || strstr(filePath, ".png") ? "rb" : "r";
+		FILE *requestedFile = fopen(filePath, mode);
 
 		//IF the file is not found, send a 404 error
 		if (requestedFile == NULL) {
