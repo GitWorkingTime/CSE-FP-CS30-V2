@@ -297,7 +297,7 @@ int initServer(char *response){
 			        char header_block[header_len + 1];
 			        strncpy(header_block, part, header_len);
 			        header_block[header_len] = '\0';
-			        printf("headerBlock: %s\n", header_block);
+			        printf("\nheaderBlock: \n%s\n", header_block);
 
 			        // Extract filename if present
 			        char *filename = NULL;
@@ -315,7 +315,7 @@ int initServer(char *response){
 			                }
 			            }
 			        }
-			        printf("filename: %s\n", filename ? filename : "(null)");
+			        printf("\nfilename: %s\n", filename ? filename : "(null)");
 
 			        // Data starts after headers + 4 for \r\n\r\n
 			        char *data_start = header_end + 4;
@@ -334,7 +334,7 @@ int initServer(char *response){
 			        while(data_len > 0 && (data_start[data_len - 1] == '\r' || data_start[data_len - 1] == '\n')){
 			            data_len--;
 			        }
-			        printf("Data length after trimming: %d\n", data_len);
+			        printf("\nData length after trimming: %d\n", data_len);
 
 			        if(filename){
 			            printf("Attempting to save!\n");
