@@ -287,6 +287,7 @@ int initServer(char *response){
 			    }
 
 			    part += strlen(boundStart) + 2; // Skip the boundary line and CRLF
+			    char *filename = NULL;
 
 			    while(part && strncmp(part, boundEnd, strlen(boundEnd)) != 0){
 			        // Find the end of headers for this part
@@ -300,20 +301,21 @@ int initServer(char *response){
 			        printf("\nheaderBlock: \n%s\n", header_block);
 
 			        // Extract filename if present
-			        char *filename = NULL;
-			        char *cd = strstr(header_block, "Content-Disposition:");
-			        if(cd){
-			            char *fn_start = strstr(cd, "filename=\"");
-			            if(fn_start){
-			                fn_start += 10;
-			                char *fn_end = strchr(fn_start, '"');
-			                if(fn_end){
-			                    size_t fn_len = fn_end - fn_start;
-			                    filename = malloc(fn_len + 1);
-			                    strncpy(filename, fn_start, fn_len);
-			                    filename[fn_len] = '\0';
-			                }
-			            }
+			        if(filename == NULL){
+			        	char *cd = strstr(header_block, "Content-Disposition:");
+				        if(cd){
+				            char *fn_start = strstr(cd, "filename=\"");
+				            if(fn_start){
+				                fn_start += 10;
+				                char *fn_end = strchr(fn_start, '"');
+				                if(fn_end){
+				                    size_t fn_len = fn_end - fn_start;
+				                    filename = malloc(fn_len + 1);
+				                    strncpy(filename, fn_start, fn_len);
+				                    filename[fn_len] = '\0';
+				                }
+				            }
+				        }
 			        }
 			        printf("\nfilename: %s\n", filename ? filename : "(null)");
 
@@ -350,7 +352,6 @@ int initServer(char *response){
 			            }else{
 			                perror("Failed to save file");
 			            }
-			            free(filename);
 			        }
 
 			        // Move to the next part: skip \r\n before boundary if present
@@ -362,8 +363,21 @@ int initServer(char *response){
 			    }
 
 			    free(body);
-			    char *okResp = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nFile uploaded successfully\n";
-			    write(newmysock, okResp, strlen(okResp));
+			    // char *okResp = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nFile uploaded successfully\n";
+			    // write(newmysock, okResp, strlen(okResp));
+
+			    if(filename){
+			    	char jsonResp[512];
+					snprintf(jsonResp, sizeof(jsonResp),
+					    "HTTP/1.0 200 OK\r\n"
+					    "Content-Type: application/json\r\n\r\n"
+					    "{\"status\": \"success\", \"filename\": \"%s\"}\n", filename);
+					write(newmysock, jsonResp, strlen(jsonResp));
+					free(filename);
+			    }else{
+			    	char *failResp = "HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFile upload failed\n";
+    				write(newmysock, failResp, strlen(failResp));
+			    }
 			    close(newmysock);
 			    continue;
 			}

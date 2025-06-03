@@ -7,7 +7,6 @@ function isJSON(str){
     }
 }
 
-
 /*
 Because this file is called in the <head> portion of the html file, we will use
 'DOMContentLoaded' event to ensure that all HTML and associated files are loaded
@@ -40,6 +39,17 @@ document.addEventListener('DOMContentLoaded', function(){
             .then(response => response.text())
             .then(data =>{
                 console.log("Server Response:", data);
+                if(isJSON(data)){
+                    const res = JSON.parse(data);
+                    if(res.filename){
+                        const img = document.createElement('img');
+                        img.src = '/uploads/' + res.filename;
+                        img.alt = "Uploaded Image";
+                        img.style.maxWidth = '300px';
+                        document.getElementById('divUserDisplay').appendChild(img);
+                    }
+
+                }
 
             })
             .catch(error =>{
