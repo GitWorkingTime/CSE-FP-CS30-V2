@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stddef.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -7,9 +8,11 @@
 #include <netinet/in.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ctype.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
+#define HEADER_BUFFER_SIZE 8192
 
 /*
 This local web server can be accessed via:
@@ -63,6 +66,10 @@ char *getContentType(char *filePath){
 		content_type = "text/css";
 	else if(strstr(filePath, ".js")){
 		content_type = "application/javascript";
+	}else if(strstr(filePath, ".png")){
+		content_type = "image/png";
+	}else if(strstr(filePath, ".jpg") || strstr(filePath, ".jpeg")){
+		content_type = "image/jpeg";
 	}
 	return content_type;
 }
@@ -79,6 +86,14 @@ void ensureUploadsFolderExists() {
     } else {
         printf("'uploads' directory already exists.\n");
     }
+}
+
+void printHex(const char *data, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02x ", (unsigned char)data[i]);
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
 }
 
 int initServer(char *response){
@@ -126,7 +141,7 @@ int initServer(char *response){
 	//Avoids compiler issues compared to while(true) due to the constant boolean expression (i.e "true")
 	for(;;){
 		//Accept incoming connections
-		int newmysock = accept(mysock, (struct sockaddr *)&host_addr, (socklen_t *)&host_addrlen);
+		int newmysock = accept(mysock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addrlen);
 
 		//If the newmysock returns an error(a.k.a -1)
 		if(newmysock < 0){
@@ -155,7 +170,7 @@ int initServer(char *response){
 		}
 
 		//Printing the IP address and port of the client after it has been read
-		printf("[%s:%u]\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+		printf("[%s:%u]\n\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 		
 		//Reading the request
 		//Create the method, path, and version variables
@@ -165,6 +180,7 @@ int initServer(char *response){
 		sscanf(buffer, "%s %s %s", method, uri, version);
 
 		if(strcmp(method, "POST") == 0 && strcmp(uri, "/api/chat") == 0){
+			printf("%s %s %s\n", method, uri, version);
 			//Find content-length from headers
 			int contentLen = 0;
 			char *contLenPtr = strstr(buffer, "Content-Length:");
@@ -200,6 +216,7 @@ int initServer(char *response){
 			if(contLenPtr){
 				sscanf(contLenPtr, "Content-Length: %d", &contentLen);
 			}
+			printf("Content-Length: %d\n", contentLen);
 			
 			char *bodyStart = strstr(buffer, "\r\n\r\n");
 			if(!bodyStart){
@@ -223,7 +240,12 @@ int initServer(char *response){
 				}
 				bodyLen += bytes;
 			}
-			body[bodyLen] = '\0';
+			if (contentLen == bodyLen){
+				printf("Body fully read\n");
+			}else{
+				printf("Body not fully read. Remaining bytes: %d\n", contentLen - bodyLen);
+			}
+
 
 			if(strstr(contentType, "application/json") != NULL){
 				printf("Received JSON: \n%s\n", body);
@@ -241,6 +263,7 @@ int initServer(char *response){
 				free(body);
 				close(newmysock);
 				continue;
+
 			}else if(strstr(contentType, "multipart/form-data") != NULL){
 				printf("Content is multipart/form-data\n");
 
@@ -250,91 +273,103 @@ int initServer(char *response){
 				snprintf(boundStart, sizeof(boundStart), "--%s", boundary);
 				snprintf(boundEnd, sizeof(boundEnd), "--%s--", boundary);
 
-				char *partStart = strstr(body, boundStart);
-				if(!partStart){
+				char *part = strstr(body, boundStart);
+				if(!part){
 					fprintf(stderr, "No multipart boundary start found\n");
 					free(body);
 					close(newmysock);
 					continue;
 				}
 
-				printf("boundary start: %s\n boundary end: %s\n", boundStart, boundEnd);
+				printf("boundary start: %s\nboundary end: %s\n", boundStart, boundEnd);
+				// Move to the first part (skip initial boundary)
+				// Find the next part boundary line (it should start with \r\n--boundary)
+				char *next_boundary = strstr(part, boundStart);
+				if (!next_boundary) break;
 
-				partStart += strlen(boundStart) + 2; //Skip boundary and CLRF
+				// Skip this line (boundary + CRLF)
+				char *headers_start = strstr(next_boundary, "\r\n");
+				if (!headers_start){
+					break;
+				}
+				headers_start += 2;  // skip \r\n
+				part = headers_start;
 
-				//Find the next boundary (end of this part)
-				char *partEnd = strstr(partStart, boundStart);
-				if(!partEnd){
-					partEnd = strstr(partStart, boundEnd);
-					if(!partEnd){
-						fprintf(stderr, "No mulipart boundary end found\n");
-						free(body);
-						close(newmysock);
-						continue;
+				while (part && strncmp(part, boundEnd, strlen(boundEnd)) != 0) {
+				    // Find the headers for this part
+				    char *header_end = strstr(part, "\r\n\r\n");
+				    if (!header_end){
+				    	break;
+				    }
+
+				    int header_len = header_end - part;
+				    char header_block[header_len + 1];
+				    strncpy(header_block, part, header_len);
+				    header_block[header_len] = '\0';
+				    printf("headerBlock: %s\n", header_block);
+
+				    // Check if this part has a filename
+				    char *filename = NULL;
+				    char *cd = strstr(header_block, "Content-Disposition:");
+				    if (cd) {
+				        char *fn_start = strstr(cd, "filename=\"");
+				        if (fn_start) {
+				            fn_start += 10;
+				            char *fn_end = strchr(fn_start, '"');
+				            if (fn_end) {
+				                size_t fn_len = fn_end - fn_start;
+				                filename = malloc(fn_len + 1);
+				                strncpy(filename, fn_start, fn_len);
+				                filename[fn_len] = '\0';
+				            }
+				        }
+				    }
+	                printf("filename: %s\n", filename);
+
+					char *data_start = header_end + 4;
+					char searchStr[256];
+					snprintf(searchStr, sizeof(searchStr), "\r\n%s", boundStart);
+					char *next_part = strstr(data_start, searchStr);
+					if (!next_part){
+					    break;
 					}
-				}
 
-				//Extract headers of the part
-				char *headEnd = strstr(partStart, "\r\n\r\n");
-				if(!headEnd){
-					fprintf(stderr, "Invalid multipart format: no header/body seperation\n");
-					free(body);
-					close(newmysock);
-					continue;
-				}
-
-				int headLen = headEnd - partStart;
-				int dataLen = partEnd - (headEnd + 4);
-
-				char headers[headLen + 1];
-				strncpy(headers, partStart, headLen);
-
-				//Parsing content-disposition to get filename
-				char *filenamePtr= strstr(headers, "filename=\"");
-				char filename[256] = {0};
-				if(filenamePtr){
-					filenamePtr + strlen("filename=\"");
-					char *filenameEnd = strchr(filenamePtr, '"');
-					if (filenameEnd){
-						int filenameLen = filenameEnd - filenamePtr;
-						strncpy(filename, filenamePtr, filenameLen);
-						filename[filenameLen] = '\0';
+					int data_len = next_part - data_start;
+					while (data_len > 0 && (data_start[data_len - 1] == '\r' || data_start[data_len - 1] == '\n')) {
+					    data_len--; // Trim trailing CRLF
 					}
-				}else{
-					fprintf(stderr, "No filename in multipart part\n");
-					free(body);
-					close(newmysock);
-					continue;
+
+					printf("filename: %s\n", filename);
+
+					if (filename) {
+					    printf("Attempting to save!\n");
+					    char filepath[256];
+					    snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
+					    printf("filepath: %s\n", filepath);
+					    FILE *fp = fopen(filepath, "wb");
+					    if (fp) {
+					        fwrite(data_start, 1, data_len, fp);
+					        fclose(fp);
+					        printf("Saved file: %s (%d bytes)\n", filepath, data_len);
+					    } else {
+					        perror("Failed to save file");
+					    }
+					    free(filename);
+					}
+
+					// Move to the next part
+					part = next_part;
+
+					char *lineEnd = strstr(part, "\r\n");
+					if(!lineEnd){
+						break;
+					}
+					part = lineEnd + 2;
 				}
 
-				//Saving the file content as raw bytes
-				char filepath[512];
-				snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
-
-				printf("filepath: %s\n", filepath);
-				FILE *fp = fopen(filepath, "wb");
-				if(!fp){
-					perror("failed to open file for writing uploaded data (fopen)");
-					printf("Failed to open file\n");
-					free(body);
-					close(newmysock);
-					continue;
-				}
-				printf("File created\n");
-
-				fwrite(headEnd + 4, 1, dataLen, fp);
-				fclose(fp);
-
-				printf("Saved uploaded file: %s\n", filepath);
-
-
-				char *okResp = "HTTP/1.0 200 OK\r\n"
-							"Content-Type: application/json\r\n\r\n"
-							"{\"status\": \"success\", \"file\": \"uploaded\"}";
-
-				write(newmysock, okResp, strlen(okResp));
 				free(body);
-				close(newmysock);
+				char *okResp = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nFile uploaded successfully\n";
+				write(newmysock, okResp, strlen(okResp));
 				continue;
 			}
 		}
@@ -382,10 +417,13 @@ int initServer(char *response){
 
 		char header[BUFFER_SIZE];
 		snprintf(header, sizeof(header),
-			"HTTP/1.0 200 OK\r\n"
-			"Content-Type: %s\r\n"
-			"Content-Length: %ld\r\n\r\n",
-			content_type, fsize);
+		    "HTTP/1.0 200 OK\r\n"
+		    "Content-Type: %s\r\n"
+		    "Access-Control-Allow-Origin: *\r\n"
+		    "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n"
+		    "Access-Control-Allow-Headers: Content-Type\r\n"
+		    "Content-Length: %ld\r\n\r\n",
+		    content_type, fsize);
 
 		//Writing to the server:
 		int writeHeader = write(newmysock, header, strlen(header));

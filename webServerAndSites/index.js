@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 break;
             }
         }
+
+        console.log("Form data: ", formData);
+
         if (hasFile == true){
             fetch('/api/chat',{
 
