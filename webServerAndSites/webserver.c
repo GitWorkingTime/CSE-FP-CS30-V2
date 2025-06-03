@@ -264,7 +264,7 @@ int initServer(char *response){
 				close(newmysock);
 				continue;
 
-			}if(strstr(contentType, "multipart/form-data") != NULL){
+			}else if(strstr(contentType, "multipart/form-data") != NULL){
 			    printf("Content is multipart/form-data\n");
 
 			    // Construct boundary strings
@@ -287,10 +287,7 @@ int initServer(char *response){
 			    }
 
 			    part += strlen(boundStart) + 2; // Skip the boundary line and CRLF
-
 			    char *filename = NULL;
-			    char *metadata_json = NULL;
-			    size_t metadata_json_len = 0;
 
 			    while(part && strncmp(part, boundEnd, strlen(boundEnd)) != 0){
 			        // Find the end of headers for this part
@@ -303,40 +300,24 @@ int initServer(char *response){
 			        header_block[header_len] = '\0';
 			        printf("\nheaderBlock: \n%s\n", header_block);
 
-			        // Parse Content-Disposition to get part name and filename
-			        char part_name[128] = {0};
-			        char *cd = strstr(header_block, "Content-Disposition:");
-			        if(cd){
-			            // Extract part name
-			            char *name_start = strstr(cd, "name=\"");
-			            if(name_start){
-			                name_start += strlen("name=\"");
-			                char *name_end = strchr(name_start, '"');
-			                if(name_end){
-			                    size_t name_len = name_end - name_start;
-			                    strncpy(part_name, name_start, name_len);
-			                    part_name[name_len] = '\0';
-			                }
-			            }
-
-			            // Extract filename if present
-			            if(filename == NULL){
-			                char *fn_start = strstr(cd, "filename=\"");
-			                if(fn_start){
-			                    fn_start += strlen("filename=\"");
-			                    char *fn_end = strchr(fn_start, '"');
-			                    if(fn_end){
-			                        size_t fn_len = fn_end - fn_start;
-			                        filename = malloc(fn_len + 1);
-			                        strncpy(filename, fn_start, fn_len);
-			                        filename[fn_len] = '\0';
-			                    }
-			                }
-			            }
+			        // Extract filename if present
+			        if(filename == NULL){
+			        	char *cd = strstr(header_block, "Content-Disposition:");
+				        if(cd){
+				            char *fn_start = strstr(cd, "filename=\"");
+				            if(fn_start){
+				                fn_start += 10;
+				                char *fn_end = strchr(fn_start, '"');
+				                if(fn_end){
+				                    size_t fn_len = fn_end - fn_start;
+				                    filename = malloc(fn_len + 1);
+				                    strncpy(filename, fn_start, fn_len);
+				                    filename[fn_len] = '\0';
+				                }
+				            }
+				        }
 			        }
-
-			        printf("\nPart name: %s\n", part_name);
-			        printf("Filename: %s\n", filename ? filename : "(none)");
+			        printf("\nfilename: %s\n", filename ? filename : "(null)");
 
 			        // Data starts after headers + 4 for \r\n\r\n
 			        char *data_start = header_end + 4;
@@ -355,19 +336,14 @@ int initServer(char *response){
 			        while(data_len > 0 && (data_start[data_len - 1] == '\r' || data_start[data_len - 1] == '\n')){
 			            data_len--;
 			        }
-			        printf("Data length after trimming: %d\n", data_len);
+			        printf("\nData length after trimming: %d\n", data_len);
 
-			        if(strcmp(part_name, "metadata") == 0){
-			            // Save metadata JSON string
-			            metadata_json = malloc(data_len + 1);
-			            memcpy(metadata_json, data_start, data_len);
-			            metadata_json[data_len] = '\0';
-			            metadata_json_len = data_len;
-			            printf("Received metadata JSON: %s\n", metadata_json);
-			        } else if(strcmp(part_name, "image") == 0 && filename){
-			            // Save uploaded file
+			        if(filename){
+			            printf("Attempting to save!\n");
 			            char filepath[256];
 			            snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
+			            printf("filepath: %s\n", filepath);
+
 			            FILE *fp = fopen(filepath, "wb");
 			            if(fp){
 			                fwrite(data_start, 1, data_len, fp);
@@ -378,38 +354,27 @@ int initServer(char *response){
 			            }
 			        }
 
+			        // Move to the next part: skip \r\n before boundary if present
 			        if(next_part){
-			            part = next_part + 2; // skip CRLF before boundary
-			        } else {
+			            part = next_part + 2;
+			        }else{
 			            break;
 			        }
 			    }
 
-			    // Optionally save metadata JSON to file
-			    if(metadata_json){
-			        FILE *fp = fopen("uploads/metadata.json", "w");
-			        if(fp){
-			            fwrite(metadata_json, 1, metadata_json_len, fp);
-			            fclose(fp);
-			            printf("Saved metadata JSON to uploads/metadata.json\n");
-			        }else{
-			            perror("Failed to save metadata JSON");
-			        }
-			        free(metadata_json);
-			    }
+			    free(body);
 
-			    // Respond with success + filename (if uploaded)
 			    if(filename){
-			        char jsonResp[512];
-			        snprintf(jsonResp, sizeof(jsonResp),
-			            "HTTP/1.0 200 OK\r\n"
-			            "Content-Type: application/json\r\n\r\n"
-			            "{\"status\": \"success\", \"filename\": \"%s\"}\n", filename);
-			        write(newmysock, jsonResp, strlen(jsonResp));
-			        free(filename);
+			    	char jsonResp[512];
+					snprintf(jsonResp, sizeof(jsonResp),
+					    "HTTP/1.0 200 OK\r\n"
+					    "Content-Type: application/json\r\n\r\n"
+					    "{\"status\": \"success\", \"filename\": \"%s\"}\n", filename);
+					write(newmysock, jsonResp, strlen(jsonResp));
+					free(filename);
 			    }else{
-			        char *failResp = "HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFile upload failed\n";
-			        write(newmysock, failResp, strlen(failResp));
+			    	char *failResp = "HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFile upload failed\n";
+    				write(newmysock, failResp, strlen(failResp));
 			    }
 			    close(newmysock);
 			    continue;
