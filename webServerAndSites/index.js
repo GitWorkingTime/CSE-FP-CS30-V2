@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', function(){
         const formData = new FormData(this);
         const jsonObj = {};
 
+        const messageText = formData.get("message");
+        const file = formData.get("image");
+
         let hasFile = false;
         for(let value of formData.values()){
             if (value instanceof File && value.size > 0){
@@ -31,6 +34,15 @@ document.addEventListener('DOMContentLoaded', function(){
         console.log("Form data: ", formData);
 
         if (hasFile == true){
+
+
+            const metadata = { message: messageText};
+
+            formData.set("metadata", JSON.stringify(metadata));
+
+            formData.delete("message");
+
+
             fetch('/api/chat',{
 
                 method: 'POST',
@@ -47,6 +59,12 @@ document.addEventListener('DOMContentLoaded', function(){
                         img.alt = "Uploaded Image";
                         img.style.maxWidth = '300px';
                         document.getElementById('divUserDisplay').appendChild(img);
+                    }
+
+                    if(res.status === "success" && metadata.message){
+                        const userMsgDisplay = document.createElement('div');
+                        userMsgDisplay.textContent = metadata.message;
+                        document.getElementById('divUserDisplay').appendChild(userMsgDisplay);
                     }
 
                 }
