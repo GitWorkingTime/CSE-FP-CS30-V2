@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function(){
             .then(response => response.text())
             .then(data =>{
                 console.log("Server Response:", data);
+
             })
             .catch(error =>{
                 console.error("Error:", error);

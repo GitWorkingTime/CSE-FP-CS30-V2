@@ -265,113 +265,109 @@ int initServer(char *response){
 				continue;
 
 			}else if(strstr(contentType, "multipart/form-data") != NULL){
-				printf("Content is multipart/form-data\n");
+			    printf("Content is multipart/form-data\n");
 
-				//Construct boundary strings
-				char boundStart[256];
-				char boundEnd[256];
-				snprintf(boundStart, sizeof(boundStart), "--%s", boundary);
-				snprintf(boundEnd, sizeof(boundEnd), "--%s--", boundary);
+			    // Construct boundary strings
+			    char boundStart[256];
+			    char boundEnd[256];
+			    snprintf(boundStart, sizeof(boundStart), "--%s", boundary);
+			    snprintf(boundEnd, sizeof(boundEnd), "--%s--", boundary);
 
-				char *part = strstr(body, boundStart);
-				if(!part){
-					fprintf(stderr, "No multipart boundary start found\n");
-					free(body);
-					close(newmysock);
-					continue;
-				}
+			    // Boundary delimiter with preceding CRLF, used to find next part boundaries
+			    char boundary_delim[260];
+			    snprintf(boundary_delim, sizeof(boundary_delim), "\r\n%s", boundStart);
 
-				printf("boundary start: %s\nboundary end: %s\n", boundStart, boundEnd);
-				// Move to the first part (skip initial boundary)
-				// Find the next part boundary line (it should start with \r\n--boundary)
-				char *next_boundary = strstr(part, boundStart);
-				if (!next_boundary) break;
+			    // Find the first boundary
+			    char *part = strstr(body, boundStart);
+			    if(!part){
+			        fprintf(stderr, "No multipart boundary start found\n");
+			        free(body);
+			        close(newmysock);
+			        continue;
+			    }
 
-				// Skip this line (boundary + CRLF)
-				char *headers_start = strstr(next_boundary, "\r\n");
-				if (!headers_start){
-					break;
-				}
-				headers_start += 2;  // skip \r\n
-				part = headers_start;
+			    part += strlen(boundStart) + 2; // Skip the boundary line and CRLF
 
-				while (part && strncmp(part, boundEnd, strlen(boundEnd)) != 0) {
-				    // Find the headers for this part
-				    char *header_end = strstr(part, "\r\n\r\n");
-				    if (!header_end){
-				    	break;
-				    }
+			    while(part && strncmp(part, boundEnd, strlen(boundEnd)) != 0){
+			        // Find the end of headers for this part
+			        char *header_end = strstr(part, "\r\n\r\n");
+			        if(!header_end) break;
 
-				    int header_len = header_end - part;
-				    char header_block[header_len + 1];
-				    strncpy(header_block, part, header_len);
-				    header_block[header_len] = '\0';
-				    printf("headerBlock: %s\n", header_block);
+			        int header_len = header_end - part;
+			        char header_block[header_len + 1];
+			        strncpy(header_block, part, header_len);
+			        header_block[header_len] = '\0';
+			        printf("headerBlock: %s\n", header_block);
 
-				    // Check if this part has a filename
-				    char *filename = NULL;
-				    char *cd = strstr(header_block, "Content-Disposition:");
-				    if (cd) {
-				        char *fn_start = strstr(cd, "filename=\"");
-				        if (fn_start) {
-				            fn_start += 10;
-				            char *fn_end = strchr(fn_start, '"');
-				            if (fn_end) {
-				                size_t fn_len = fn_end - fn_start;
-				                filename = malloc(fn_len + 1);
-				                strncpy(filename, fn_start, fn_len);
-				                filename[fn_len] = '\0';
-				            }
-				        }
-				    }
-	                printf("filename: %s\n", filename);
+			        // Extract filename if present
+			        char *filename = NULL;
+			        char *cd = strstr(header_block, "Content-Disposition:");
+			        if(cd){
+			            char *fn_start = strstr(cd, "filename=\"");
+			            if(fn_start){
+			                fn_start += 10;
+			                char *fn_end = strchr(fn_start, '"');
+			                if(fn_end){
+			                    size_t fn_len = fn_end - fn_start;
+			                    filename = malloc(fn_len + 1);
+			                    strncpy(filename, fn_start, fn_len);
+			                    filename[fn_len] = '\0';
+			                }
+			            }
+			        }
+			        printf("filename: %s\n", filename ? filename : "(null)");
 
-					char *data_start = header_end + 4;
-					char searchStr[256];
-					snprintf(searchStr, sizeof(searchStr), "\r\n%s", boundStart);
-					char *next_part = strstr(data_start, searchStr);
-					if (!next_part){
-					    break;
-					}
+			        // Data starts after headers + 4 for \r\n\r\n
+			        char *data_start = header_end + 4;
 
-					int data_len = next_part - data_start;
-					while (data_len > 0 && (data_start[data_len - 1] == '\r' || data_start[data_len - 1] == '\n')) {
-					    data_len--; // Trim trailing CRLF
-					}
+			        // Find next part boundary (with CRLF before boundary)
+			        char *next_part = strstr(data_start, boundary_delim);
+			        int data_len;
+			        if(next_part){
+			            data_len = next_part - data_start;
+			        }else{
+			            // Last part: data till end of body
+			            data_len = contentLen - (data_start - body);
+			        }
 
-					printf("filename: %s\n", filename);
+			        // Trim trailing CRLF from data
+			        while(data_len > 0 && (data_start[data_len - 1] == '\r' || data_start[data_len - 1] == '\n')){
+			            data_len--;
+			        }
+			        printf("Data length after trimming: %d\n", data_len);
 
-					if (filename) {
-					    printf("Attempting to save!\n");
-					    char filepath[256];
-					    snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
-					    printf("filepath: %s\n", filepath);
-					    FILE *fp = fopen(filepath, "wb");
-					    if (fp) {
-					        fwrite(data_start, 1, data_len, fp);
-					        fclose(fp);
-					        printf("Saved file: %s (%d bytes)\n", filepath, data_len);
-					    } else {
-					        perror("Failed to save file");
-					    }
-					    free(filename);
-					}
+			        if(filename){
+			            printf("Attempting to save!\n");
+			            char filepath[256];
+			            snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
+			            printf("filepath: %s\n", filepath);
 
-					// Move to the next part
-					part = next_part;
+			            FILE *fp = fopen(filepath, "wb");
+			            if(fp){
+			                fwrite(data_start, 1, data_len, fp);
+			                fclose(fp);
+			                printf("Saved file: %s (%d bytes)\n", filepath, data_len);
+			            }else{
+			                perror("Failed to save file");
+			            }
+			            free(filename);
+			        }
 
-					char *lineEnd = strstr(part, "\r\n");
-					if(!lineEnd){
-						break;
-					}
-					part = lineEnd + 2;
-				}
+			        // Move to the next part: skip \r\n before boundary if present
+			        if(next_part){
+			            part = next_part + 2;
+			        }else{
+			            break;
+			        }
+			    }
 
-				free(body);
-				char *okResp = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nFile uploaded successfully\n";
-				write(newmysock, okResp, strlen(okResp));
-				continue;
+			    free(body);
+			    char *okResp = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nFile uploaded successfully\n";
+			    write(newmysock, okResp, strlen(okResp));
+			    close(newmysock);
+			    continue;
 			}
+
 		}
 
 		//Printing the request header
