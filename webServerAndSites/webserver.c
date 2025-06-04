@@ -14,9 +14,54 @@
 #define BUFFER_SIZE 1024
 #define HEADER_BUFFER_SIZE 8192
 
+//List of connected SSE clients
+#define MAX_CLIENTS 100
+int sse_clients[MAX_CLIENTS];
+int sse_client_count = 0;
+
+void sendSSEUpdate(const char *jsonData) {
+    char msg[BUFFER_SIZE];
+    snprintf(msg, sizeof(msg), "data: %s\n\n", jsonData);  // SSE format: 'data: <jsonData>\n\n'
+
+    for (int i = 0; i < sse_client_count; i++) {
+        int client_fd = sse_clients[i];
+        // Try sending to the client
+        if (write(client_fd, msg, strlen(msg)) < 0) {
+            // If the write fails, remove the client
+            close(client_fd);
+            sse_clients[i] = sse_clients[--sse_client_count];
+            i--;  // Adjust index after removal
+        }
+    }
+}
+
+// Function to handle SSE connections
+void handleSSEConnection(int newmysock) {
+    // Send the necessary SSE headers
+    char *header = "HTTP/1.1 200 OK\r\n"
+                   "Content-Type: text/event-stream\r\n"
+                   "Cache-Control: no-cache\r\n"
+                   "Connection: keep-alive\r\n\r\n";
+    write(newmysock, header, strlen(header));
+
+    // Add this socket to the list of SSE clients
+    if (sse_client_count < MAX_CLIENTS) {
+        sse_clients[sse_client_count++] = newmysock;
+    } else {
+        printf("Max SSE clients reached. Ignoring new client.\n");
+    }
+}
 /*
 This local web server can be accessed via:
 	http://localhost:8080
+
+Issues so far:
+- Able to POST a text as JSON and file as multipart/form-data seperately but not together at the same time
+
+TO-DO:
+- transfer data to different clients/update other clients whenever files changes
+- better HTML webpage + CSS
+
 */
 
 int createSocket(){
@@ -70,6 +115,8 @@ char *getContentType(char *filePath){
 		content_type = "image/png";
 	}else if(strstr(filePath, ".jpg") || strstr(filePath, ".jpeg")){
 		content_type = "image/jpeg";
+	}else if(strstr(filePath, ".json")){
+		content_type = "application/json";
 	}
 	return content_type;
 }
@@ -179,6 +226,11 @@ int initServer(char *response){
 		//the '%s' refers to the string formatting: each variable is formatted as a string
 		sscanf(buffer, "%s %s %s", method, uri, version);
 
+		if(strcmp(method, "GET") == 0 && strcmp(uri, "/events") == 0){
+			handleSSEConnection(newmysock);
+			continue;
+		} 
+
 		if(strcmp(method, "POST") == 0 && strcmp(uri, "/api/chat") == 0){
 			printf("%s %s %s\n", method, uri, version);
 			//Find content-length from headers
@@ -251,6 +303,7 @@ int initServer(char *response){
 				printf("Received JSON: \n%s\n", body);
 				if(saveJSONToFile("uploads/received.json", body) == 0){
 					printf("JSON saved successfully!\n");
+					sendSSEUpdate(body);
 				}else{
 					fprintf(stderr, "Failed to save JSON file. \n");
 				}

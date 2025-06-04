@@ -84,12 +84,12 @@ document.addEventListener('DOMContentLoaded', function(){
             const jsonString = JSON.stringify(jsonObj);
             console.log(jsonString);
 
-            const userMsg = jsonObj.message;
-            const displayDiv = document.getElementById('divUserDisplay');
+            // const userMsg = jsonObj.message;
+            // const displayDiv = document.getElementById('divUserDisplay');
 
-            const userMsgDisplay = document.createElement('div');
-            userMsgDisplay.textContent = userMsg;
-            displayDiv.appendChild(userMsgDisplay);
+            // const userMsgDisplay = document.createElement('div');
+            // userMsgDisplay.textContent = userMsg;
+            // displayDiv.appendChild(userMsgDisplay);
 
 
             fetch('/api/chat',{
@@ -108,10 +108,47 @@ document.addEventListener('DOMContentLoaded', function(){
             .catch(error =>{
                 console.error("Error:", error);
                 this.reset();
-            })
+            });
         }
 
 
     }); 
+
+    //SSE client-side connection for receiving updates
+    const eventSource = new EventSource("/events");
+
+    eventSource.onopen = function(event){
+        console.log("SSE Connection opened");
+    };
+
+    eventSource.onmessage = function(event) {
+        console.log("Received SSE message:", event.data);
+        
+        // If the server sends a JSON message
+        if (isJSON(event.data)) {
+            const data = JSON.parse(event.data);
+
+            // Handle the received data, e.g., display a new message
+            const displayDiv = document.getElementById('divUserDisplay');
+            const newMsgDisplay = document.createElement('div');
+            newMsgDisplay.textContent = data.message;  // Assuming message is part of the data
+            displayDiv.appendChild(newMsgDisplay);
+
+            // Handle any other logic with the incoming data
+            if (data.filename) {
+                const img = document.createElement('img');
+                img.src = '/uploads/' + data.filename;
+                img.alt = "Uploaded Image";
+                img.style.maxWidth = '300px';
+                displayDiv.appendChild(img);
+            }
+        }
+    };
+
+    eventSource.onerror = function(event) {
+        console.error("SSE Error:", event);
+        // Handle error scenarios, like reconnecting if necessary
+    };
+
 
 });
