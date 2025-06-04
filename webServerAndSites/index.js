@@ -68,10 +68,12 @@ document.addEventListener('DOMContentLoaded', function(){
                     }
 
                 }
+                this.reset();
 
             })
             .catch(error =>{
                 console.error("Error:", error);
+                this.reset();
             });
         } else{
             //Copies all key-value pairs from the FormData and adds it to a regular JS object
@@ -101,9 +103,11 @@ document.addEventListener('DOMContentLoaded', function(){
             .then(response => response.text())
             .then(data =>{
                 console.log("Server Response:", data);
+                this.reset();
             })
             .catch(error =>{
                 console.error("Error:", error);
+                this.reset();
             })
         }
 

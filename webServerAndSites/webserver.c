@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <ctype.h>
+#include "multipart-parser-c-master/multipart_parser.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -300,24 +301,46 @@ int initServer(char *response){
 			        header_block[header_len] = '\0';
 			        printf("\nheaderBlock: \n%s\n", header_block);
 
+
+			        //Look at the name part of the multipart/form-data request
+			        //Extracting name and filename
+			        char name[128] = {0};
+			        char *contDis = strstr(header_block, "Content-Disposition");
+					
+					if (contDis) {
+					    char *name_start = strstr(contDis, "name=\"");
+					    if (name_start) {
+					        name_start += 6; // Move past 'name="'
+					        char *name_end = strchr(name_start, '"');
+					        if (name_end) {
+					            size_t name_len = name_end - name_start;
+					            if (name_len < sizeof(name)) {
+					                strncpy(name, name_start, name_len);
+					                name[name_len] = '\0';
+					            }
+					        }
+					    }
+					}
+					printf("name: %s\n", name);
+
 			        // Extract filename if present
-			        if(filename == NULL){
-			        	char *cd = strstr(header_block, "Content-Disposition:");
-				        if(cd){
-				            char *fn_start = strstr(cd, "filename=\"");
-				            if(fn_start){
-				                fn_start += 10;
-				                char *fn_end = strchr(fn_start, '"');
-				                if(fn_end){
-				                    size_t fn_len = fn_end - fn_start;
-				                    filename = malloc(fn_len + 1);
-				                    strncpy(filename, fn_start, fn_len);
-				                    filename[fn_len] = '\0';
-				                }
-				            }
-				        }
+			        char *thisFilename = NULL;
+		        	char *cd = strstr(header_block, "Content-Disposition:");
+			        if(cd){
+			            char *fn_start = strstr(cd, "filename=\"");
+			            if(fn_start){
+			                fn_start += 10;
+			                char *fn_end = strchr(fn_start, '"');
+			                if(fn_end){
+			                    size_t fn_len = fn_end - fn_start;
+			                    thisFilename = malloc(fn_len + 1);
+			                    strncpy(thisFilename, fn_start, fn_len);
+			                    thisFilename[fn_len] = '\0';
+			                }
+			            }
 			        }
-			        printf("\nfilename: %s\n", filename ? filename : "(null)");
+			        
+			        printf("\nfilename: %s\n", thisFilename ? thisFilename : "(null)");
 
 			        // Data starts after headers + 4 for \r\n\r\n
 			        char *data_start = header_end + 4;
@@ -338,10 +361,10 @@ int initServer(char *response){
 			        }
 			        printf("\nData length after trimming: %d\n", data_len);
 
-			        if(filename){
+			        if(thisFilename){
 			            printf("Attempting to save!\n");
 			            char filepath[256];
-			            snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
+			            snprintf(filepath, sizeof(filepath), "uploads/%s", thisFilename);
 			            printf("filepath: %s\n", filepath);
 
 			            FILE *fp = fopen(filepath, "wb");
@@ -352,14 +375,18 @@ int initServer(char *response){
 			            }else{
 			                perror("Failed to save file");
 			            }
+
+			            free(filename);
+			            filename = strdup(thisFilename);
+			            free(thisFilename);
 			        }
 
 			        // Move to the next part: skip \r\n before boundary if present
-			        if(next_part){
-			            part = next_part + 2;
-			        }else{
-			            break;
-			        }
+					if(next_part){
+					    part = next_part + strlen(boundary_delim);
+					}else{
+					    break;
+					}
 			    }
 
 			    free(body);
@@ -370,6 +397,8 @@ int initServer(char *response){
 					    "HTTP/1.0 200 OK\r\n"
 					    "Content-Type: application/json\r\n\r\n"
 					    "{\"status\": \"success\", \"filename\": \"%s\"}\n", filename);
+
+					printf("jsonResp:\n%s\n", jsonResp);
 					write(newmysock, jsonResp, strlen(jsonResp));
 					free(filename);
 			    }else{
