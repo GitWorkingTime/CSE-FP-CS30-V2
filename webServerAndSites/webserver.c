@@ -277,7 +277,7 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
         char *filename = extract_filename(headers_str);
         char *name = extract_name(headers_str);
         char filepath[256];
-        if (filename) {
+        if (!(filename == NULL || filename[0] == '\0')) {
             printf("Filename: %s\n", filename);
             snprintf(filepath, sizeof(filepath), "uploads/%s", filename);
             // Example: save the file data to disk
