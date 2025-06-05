@@ -1,58 +1,79 @@
 document.addEventListener('DOMContentLoaded', function(){
     const form = document.getElementById("chatMessages");
-    form.addEventListener('submit', function(event){
+    const divUserDisplay = document.getElementById("divUserDisplay");
+
+    // === HELPER TO DISPLAY MESSAGE/IMAGE ===
+    function displayMessageAndImage(data) {
+        if (data.message) {
+            const userMsgDisplay = document.createElement('div');
+            userMsgDisplay.textContent = data.message;
+            divUserDisplay.appendChild(userMsgDisplay);
+        }
+
+        if (data.image && data.image !== "") {
+            const userImg = document.createElement('img');
+            userImg.src = '/uploads/' + data.image;
+            userImg.alt = "uploaded image";
+            userImg.style.maxWidth = '300px';
+            userImg.style.display = 'block';
+            divUserDisplay.appendChild(userImg);
+        }
+    }
+
+    // === FETCH INITIAL JSON ON PAGE LOAD ===
+    fetch('/uploads/received.json')
+    .then(res => res.json())
+    .then(data => {
+        console.log("Initial JSON fetched:", data);
+        displayMessageAndImage(data);
+    })
+    .catch(err => {
+        console.warn("No existing received.json found or error parsing:", err);
+    });
+
+    // === SSE LISTENER ===
+    const evtSource = new EventSource("/events");
+
+    evtSource.onmessage = function (event) {
+        console.log("SSE Event Received:", event.data);
+        fetch('/uploads/received.json')
+            .then(res => res.json())
+            .then(data => {
+                console.log("Updated JSON fetched:", data);
+                displayMessageAndImage(data);
+            })
+            .catch(err => {
+                console.error("Failed to fetch updated JSON:", err);
+            });
+    };
+
+    // === FORM SUBMISSION HANDLER ===
+    form.addEventListener('submit', function (event) {
         event.preventDefault();
-        console.log("Default action prevented");
+        console.log("Form submission intercepted.");
 
         const formData = new FormData(this);
-        console.log("Form Data:", formData);
-
         const messageText = formData.get("message");
-        const file = formData.get("image");
 
-        const metadata = { message: messageText}
+        const metadata = { message: messageText };
         formData.set("metadata", JSON.stringify(metadata));
         formData.delete("message");
 
-        fetch('/api/chat',{
+        fetch('/api/chat', {
             method: 'POST',
             body: formData
         })
         .then(response => response.text())
-        .then(data =>{
+        .then(data => {
             console.log("Server Response:", data);
-            form.reset();
-            return fetch('/uploads/received.json');
+            form.reset(); // UI update will now happen via SSE
         })
-        .then(res => res.json())
-        .then(data =>{
-            console.log("fetched JSON:", data);
-            const msg = data.message;
-            console.log("user msg:", msg);
-
-            const userMsgDisplay = document.createElement('div');
-            userMsgDisplay.textContent = msg;
-            document.getElementById('divUserDisplay').appendChild(userMsgDisplay);
-
-            const img = data.image;
-            console.log("user img:", img);
-            if (!(img == "")){
-                // console.log("image");
-                const userImg = document.createElement('img');
-                userImg.src = '/uploads/' + img;
-                userImg.alt = "uploaded image";
-                userImg.style.maxWidth = '300px';
-                document.getElementById('divUserDisplay').appendChild(userImg);
-            }
-
-        })
-        .catch(error =>{
-            console.log("ERROR");
+        .catch(error => {
+            console.error("Upload error:", error);
             form.reset();
         });
-    })
+    });
 });
-
 
 
 

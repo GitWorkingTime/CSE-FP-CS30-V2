@@ -56,10 +56,11 @@ This local web server can be accessed via:
 	http://localhost:8080
 
 Issues so far:
-- Able to POST a text as JSON and file as multipart/form-data seperately but not together at the same time
+- Able to POST a text as JSON and file as multipart/form-data seperately but not together at the same time = FIXED
 
 TO-DO:
-- transfer data to different clients/update other clients whenever files changes
+- transfer data to different clients/update other clients whenever files changes = DONE
+- Figure out how to keep the server up between clients. Closes prematurely
 - better HTML webpage + CSS
 
 */
@@ -342,12 +343,15 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
     strcat(jsonString, savedMessage);
     printf("final json string:%s\n", jsonString);
     saveJSONToFile("uploads/received.json", jsonString);
-
-
+    sendSSEUpdate(jsonString);
 }
 
 int initServer(char *response){
 	ensureUploadsFolderExists();
+
+	char initialJSON[256];
+	strcpy(initialJSON, "{\"image\":\"\",\"message\":\"\"}");
+	saveJSONToFile("uploads/received.json",initialJSON);
 
 	char buffer[BUFFER_SIZE];
 	char *resp = response;
@@ -431,6 +435,14 @@ int initServer(char *response){
 
 		//Print out the HTTP Request
 		printf("%s %s %s\n", method, uri, version);
+
+		// Handle SSE connection
+		if (strcmp(method, "GET") == 0 && strcmp(uri, "/events") == 0) {
+		    printf("SSE connection initiated\n");
+		    handleSSEConnection(newmysock);
+		    // Don't close the socket here, keep it open for SSE streaming
+		    continue;
+		}
 
 		if(strcmp(method, "POST") == 0 && strcmp(uri, "/api/chat") == 0){
 			printf("Starting POST request\n");
