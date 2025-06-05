@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function(){
         const metadata = { message: messageText}
         formData.set("metadata", JSON.stringify(metadata));
         formData.delete("message");
-        
+
         fetch('/api/chat',{
             method: 'POST',
             body: formData
@@ -22,6 +22,29 @@ document.addEventListener('DOMContentLoaded', function(){
         .then(data =>{
             console.log("Server Response:", data);
             form.reset();
+            return fetch('/uploads/received.json');
+        })
+        .then(res => res.json())
+        .then(data =>{
+            console.log("fetched JSON:", data);
+            const msg = data.message;
+            console.log("user msg:", msg);
+
+            const userMsgDisplay = document.createElement('div');
+            userMsgDisplay.textContent = msg;
+            document.getElementById('divUserDisplay').appendChild(userMsgDisplay);
+
+            const img = data.image;
+            console.log("user img:", img);
+            if (!(img == "")){
+                // console.log("image");
+                const userImg = document.createElement('img');
+                userImg.src = '/uploads/' + img;
+                userImg.alt = "uploaded image";
+                userImg.style.maxWidth = '300px';
+                document.getElementById('divUserDisplay').appendChild(userImg);
+            }
+
         })
         .catch(error =>{
             console.log("ERROR");

@@ -143,6 +143,19 @@ void printHex(const char *data, int len) {
     printf("\n");
 }
 
+//From GeeksforGeeks:
+char* deleteCharC(char* s, char ch) {
+    int i, j;
+    int len = strlen(s);
+    for (i = j = 0; i < len; i++) {
+        if (s[i] != ch) {
+            s[j++] = s[i];
+        }
+    }
+    s[j] = '\0';
+    return s;
+}
+
 char *extract_filename(const char *header_block) {
     const char *cd = strstr(header_block, "Content-Disposition:");
     if (!cd) return NULL;
@@ -211,6 +224,9 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
 
     const char *cursor = body;
     size_t remaining = content_len;
+
+    char savedFilename[256] = "\"image\":\"\"";
+    char savedMessage[256];
 
     while (1) {
         // Find the next boundary
@@ -289,6 +305,11 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
             } else {
                 perror("Failed to open file for writing");
             }
+
+
+            snprintf(savedFilename, sizeof(savedFilename), "\"image\":\"%s\"", filename);
+            // printf("savedFilename:%s\n", savedFilename);
+
             free(filename);
         }else if(name){
 		    char *value = malloc(data_len + 1);
@@ -296,7 +317,9 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
 		        memcpy(value, data_start, data_len);
 		        value[data_len] = '\0'; // null terminate
 		        printf("Field name: %s, value: %s\n", name, value);
-		        saveJSONToFile("uploads/received.json", value);
+		        strcpy(savedMessage, value);
+		        // printf("saved message:%s\n", savedMessage);
+		        // saveJSONToFile("uploads/received.json", value);
 		        // Here, if name == "message", you can store or process the message text
 		        free(value);
 		    }
@@ -304,13 +327,23 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
         }
 
         free(headers_str);
-
         // Move cursor to next boundary start
         cursor = next_boundary;
         if (!cursor) break;  // No more parts
 
         remaining = content_len - (cursor - body);
     }
+
+    char jsonString[256] = "{";
+    deleteCharC(savedMessage, '{');
+    // printf("saved msg:%s\n", savedMessage);
+    strcat(jsonString, savedFilename);
+    strcat(jsonString, ",");
+    strcat(jsonString, savedMessage);
+    printf("final json string:%s\n", jsonString);
+    saveJSONToFile("uploads/received.json", jsonString);
+
+
 }
 
 int initServer(char *response){
@@ -474,6 +507,19 @@ int initServer(char *response){
 			parse_multipart_form_data(body, content_len, boundary_string);
 
 			printf("multipart parsed!\n");
+			const char *response_body = "{\"status\":\"success\", \"message\":\"File(s) uploaded and JSON saved.\"}";
+			char response_header[BUFFER_SIZE];
+			snprintf(response_header, sizeof(response_header),
+			         "HTTP/1.1 200 OK\r\n"
+			         "Content-Type: application/json\r\n"
+			         "Content-Length: %zu\r\n"
+			         "Connection: close\r\n\r\n",
+			         strlen(response_body));
+
+			// Send headers
+			write(newmysock, response_header, strlen(response_header));
+			// Send body
+			write(newmysock, response_body, strlen(response_body));
 
 
 			free(body);
