@@ -54,15 +54,6 @@ void handleSSEConnection(int newmysock) {
 /*
 This local web server can be accessed via:
 	http://localhost:8080
-
-Issues so far:
-- Able to POST a text as JSON and file as multipart/form-data seperately but not together at the same time = FIXED
-
-TO-DO:
-- transfer data to different clients/update other clients whenever files changes = DONE
-- Figure out how to keep the server up between clients. Closes prematurely
-- better HTML webpage + CSS
-
 */
 
 int createSocket(){

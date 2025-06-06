@@ -2,66 +2,100 @@
 
 /*
 
-colours:
-#e0d9d9
-#c9bcbc
-#f0f0f0
-#433bff
+Inspiration is Discord:
+- Colours:
+Background: #15181e
+Text: #efe9f7
+Primary: #a87ae8
+Secondary: #edb9ff
+Accent: #4701d3
+
 */
+:root{
+    --BACKGROUND: #15181e;
+    --SECONDARY_BACK: #1f242c;
+    --TERTIARY_BACK: #333a48;
+    --TEXT: #efe9f7;
+    --PRIMARY: #a87ae8;
+    --SECONDARY: #edb9ff;
+    --ACCENT: #4701d3;
+}
+
 
 body {
-    background-color: #f0f0f0;
+    background-color: var(--BACKGROUND);
+    color: var(--TEXT);
     font-family: "Inter", sans-serif;
     text-align: center;
     padding: 50px;
+    height: 100%;
 }
 
-h1 {
-    color: #333;
+.userDisplay {
+    height: 30rem; /* changed from max-height */
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 1rem;
+    background-color: var(--SECONDARY_BACK);
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    text-align: left;
 }
 
-.divUserInput{
-    display: inline-block;
+.userInput{
+    min-height: 0px;
+    width: 100%;
 }
 
-.divMessage{
-    background-color: #e0d9d9;
-    border-radius: 10px;
-    padding: 0.75rem;
+.divInput{
+    background-color: var(--TERTIARY_BACK);
+    border-bottom-left-radius: 1rem;
+    border-bottom-right-radius: 1rem;
+    padding: 0.5rem;
+    display: flex;
 }
 
 .messageTextArea{
-    border-radius: 5px;
+    border-radius: 1rem;
+    margin-right: 0.5rem;
+    padding: 0.5rem;
     border: none;
-    background-color: #f0f0f0;
-    width: 18rem;
-    height: 12rem;
-    font-family: "Inter", sans-serif;
     resize: none;
+    background-color: var(--SECONDARY_BACK);
+    color: var(--TEXT);
+    font-family: "Inter", sans-serif;
+    width: calc(100% - 2rem);
     word-break: break-word;
+    overflow: hidden;
+    transition: height 0.2s ease;
 }
 
-.divImage{
-    background-color: #e0d9d9;
-    border-radius: 10px;
-    padding: 0.75rem;
+input[type="file"]::file-selector-button{
+    padding: 1rem;
+    border: none;
+    background-color: var(--SECONDARY_BACK);
+    color: var(--TEXT);
+    font-family: "Inter", sans-serif;
+    border-radius: 1rem;
+}
+
+input[type="file"]::file-selector-button:hover{
+    background-color: var(--SECONDARY);
+    color: var(--BACKGROUND);
 }
 
 .submit{
-    border-radius: 5px;
+    padding: 1rem;
+    border-radius: 1rem;
     border: none;
     font-family: "Inter", sans-serif;
     font-size: 15px;
-    background-color: #e0d9d9;
+    background-color: var(--SECONDARY_BACK);
+    color: var(--TEXT);
 }
 
 .submit:hover{
-    background-color: #c9bcbc;
-}
-
-.divUserDisplay{
-    background-color: #e0d9d9;
-    border-radius: 10px;
-    padding: 0.75rem;
-    text-align: left;
+    background-color: var(--BACKGROUND);
 }

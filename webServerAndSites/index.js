@@ -1,6 +1,15 @@
 document.addEventListener('DOMContentLoaded', function(){
     const form = document.getElementById("chatMessages");
-    const divUserDisplay = document.getElementById("divUserDisplay");
+    const divUserDisplay = document.getElementById("userDisplay");
+
+    const textarea = document.querySelector(".messageTextArea");
+
+    function autoResize() {
+        this.style.height = "auto"; // Reset height
+        this.style.height = this.scrollHeight + "px"; // Set new height
+    }
+
+    textarea.addEventListener("input", autoResize);
 
     // === HELPER TO DISPLAY MESSAGE/IMAGE ===
     function displayMessageAndImage(data) {
@@ -18,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function(){
             userImg.style.display = 'block';
             divUserDisplay.appendChild(userImg);
         }
+        divUserDisplay.scrollTop = divUserDisplay.scrollHeight;
     }
 
     // === FETCH INITIAL JSON ON PAGE LOAD ===
