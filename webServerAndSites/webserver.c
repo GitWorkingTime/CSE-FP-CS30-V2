@@ -8,11 +8,17 @@
 #include <netinet/in.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <ctype.h>
+#include <pthread.h>
+#include <signal.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 2048
 #define HEADER_BUFFER_SIZE 8192
+
+/*
+This local web server can be accessed via:
+	http://localhost:8080
+*/
 
 //List of connected SSE clients
 #define MAX_CLIENTS 100
@@ -51,10 +57,23 @@ void handleSSEConnection(int newmysock) {
         printf("Max SSE clients reached. Ignoring new client.\n");
     }
 }
-/*
-This local web server can be accessed via:
-	http://localhost:8080
-*/
+
+void *sse_keepalive_thread(void *arg) {
+    while (1) {
+        sleep(15);  // Send every 15 seconds
+        for (int i = 0; i < sse_client_count; i++) {
+            int client_fd = sse_clients[i];
+            if (write(client_fd, ": keep-alive\n\n", strlen(": keep-alive\n\n")) < 0) {
+                // remove client on error
+                close(client_fd);
+                sse_clients[i] = sse_clients[--sse_client_count];
+                i--;
+            }
+        }
+    }
+    return NULL;
+}
+
 
 int createSocket(){
 	int mysock = socket(AF_INET, SOCK_STREAM, 0);
@@ -217,8 +236,9 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
     const char *cursor = body;
     size_t remaining = content_len;
 
-    char savedFilename[256] = "\"image\":\"\"";
-    char savedMessage[256];
+    char savedFilename[4096] = "\"image\":\"\"";
+    char savedMessage[4096];
+    savedMessage[0] = '\0';
 
     while (1) {
         // Find the next boundary
@@ -326,19 +346,23 @@ void parse_multipart_form_data(const char *body, size_t content_len, const char 
         remaining = content_len - (cursor - body);
     }
 
-    char jsonString[256] = "{";
+    char jsonString[4096] = "{";
     deleteCharC(savedMessage, '{');
     // printf("saved msg:%s\n", savedMessage);
     strcat(jsonString, savedFilename);
     strcat(jsonString, ",");
     strcat(jsonString, savedMessage);
-    printf("final json string:%s\n", jsonString);
     saveJSONToFile("uploads/received.json", jsonString);
     sendSSEUpdate(jsonString);
 }
 
 int initServer(char *response){
+	signal(SIGPIPE, SIG_IGN);
 	ensureUploadsFolderExists();
+	pthread_t keepalive_thread;
+	if(pthread_create(&keepalive_thread, NULL, sse_keepalive_thread, NULL) != 0){
+		perror("Failed to create SSE keepalive thread");
+	}
 
 	char initialJSON[256];
 	strcpy(initialJSON, "{\"image\":\"\",\"message\":\"\"}");
@@ -385,8 +409,11 @@ int initServer(char *response){
 	//Acts the same as a while loop. 
 	//Avoids compiler issues compared to while(true) due to the constant boolean expression (i.e "true")
 	for(;;){
+		//resetting client address length:
+		client_addrlen = sizeof(client_addr);
+
 		//Accept incoming connections
-		int newmysock = accept(mysock, (struct sockaddr *)&host_addr, (socklen_t *)&host_addrlen);
+		int newmysock = accept(mysock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addrlen);
 
 		//If the newmysock returns an error(a.k.a -1)
 		if(newmysock < 0){
@@ -398,12 +425,12 @@ int initServer(char *response){
 		printf("connnection accepted:\n");
 
 		//Get client address
-		int clientsock = getsockname(newmysock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addrlen);
+		// int clientsock = getsockname(newmysock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addrlen);
 
-		if (clientsock < 0){
-			perror("webserver (getsockname");
-			continue;
-		}
+		// if (clientsock < 0){
+		// 	perror("webserver (getsockname");
+		// 	continue;
+		// }
 
 		//Read the accepted socket:
 		int valread = read(newmysock, buffer, BUFFER_SIZE);
@@ -557,8 +584,20 @@ int initServer(char *response){
 		long fsize = ftell(requestedFile);
 		rewind(requestedFile);
 
+		if (fsize < 0) {
+		    fprintf(stderr, "ftell returned negative size\n");
+		    close(newmysock);
+		    continue;
+		}
+
 		//Reading file content
 		char *fileContent = malloc(fsize + 1);
+		if (!fileContent) {
+		    fprintf(stderr, "malloc failed for file size %ld\n", fsize);
+		    close(newmysock);
+		    continue;
+		}
+
 		fread(fileContent, 1, fsize, requestedFile);
 		fileContent[fsize] = 0;
 		fclose(requestedFile);
@@ -576,14 +615,18 @@ int initServer(char *response){
 		//Writing to the server:
 		int writeHeader = write(newmysock, header, strlen(header));
 		if(writeHeader < 0){
-			perror("webserver (write)");
+			fprintf(stderr, "write() failed: %s\n", strerror(errno));
+			close(newmysock);
 			continue;
 		}
 
 		int writeFile = write(newmysock, fileContent, fsize);
 		if(writeFile < 0){
-			perror("webserver (write)");
+			fprintf(stderr, "write() failed: %s\n", strerror(errno));
+			close(newmysock);
 			continue;
+		}else{
+			printf("successfully file written\n");
 		}
 
 		free(fileContent);

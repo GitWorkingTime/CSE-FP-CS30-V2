@@ -28,20 +28,21 @@ body {
     font-family: "Inter", sans-serif;
     text-align: center;
     padding: 50px;
-    height: 100%;
+    height: 100vh;
+    width: 85vw;
 }
 
 .userDisplay {
-    height: 30rem; /* changed from max-height */
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    padding: 1rem;
+    display: gird;
+    grid-auto-rows: min-content;
+    align-content: end;
     background-color: var(--SECONDARY_BACK);
+    height: 30rem;
+    overflow-y: auto;
+    text-align: left;
+    padding: 1rem;
     border-top-left-radius: 1rem;
     border-top-right-radius: 1rem;
-    text-align: left;
 }
 
 .userInput{
@@ -54,22 +55,19 @@ body {
     border-bottom-left-radius: 1rem;
     border-bottom-right-radius: 1rem;
     padding: 0.5rem;
-    display: flex;
 }
 
 .messageTextArea{
-    border-radius: 1rem;
-    margin-right: 0.5rem;
-    padding: 0.5rem;
-    border: none;
-    resize: none;
     background-color: var(--SECONDARY_BACK);
     color: var(--TEXT);
-    font-family: "Inter", sans-serif;
-    width: calc(100% - 2rem);
+    border: none;
+    resize: none;
+    width: 95%;
+    overflow:hidden;
     word-break: break-word;
-    overflow: hidden;
     transition: height 0.2s ease;
+    font-family: "Inter", sans-serif;
+    border-radius: 0.25rem;
 }
 
 input[type="file"]::file-selector-button{
@@ -91,7 +89,6 @@ input[type="file"]::file-selector-button:hover{
     border-radius: 1rem;
     border: none;
     font-family: "Inter", sans-serif;
-    font-size: 15px;
     background-color: var(--SECONDARY_BACK);
     color: var(--TEXT);
 }
