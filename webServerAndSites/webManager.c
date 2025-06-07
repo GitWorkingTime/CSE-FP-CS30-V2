@@ -73,7 +73,7 @@ int main() {
 
     const int headerSize = strlen(htmlHeader);
     long fileSize = getFileSize("index.html") + headerSize;
-    char *resp = malloc(fileSize + 1);
+    char *resp = (char *)malloc(fileSize + 1);
 
     strcpy(resp, htmlHeader);
 

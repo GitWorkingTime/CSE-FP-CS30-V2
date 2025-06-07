@@ -571,7 +571,7 @@ int initServer(char *response){
 		if (requestedFile == NULL) {
 			char *not_found = "HTTP/1.0 404 Not Found\r\n"
 			                  "Content-Type: text/html\r\n\r\n"
-			                  "<h1>404 Not Found</h1>";
+			                  "<h1>404 Not Found</h1>\r\n";
 			write(newmysock, not_found, strlen(not_found));
 			close(newmysock);
 			continue; //Go to the next iteration
